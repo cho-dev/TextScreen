@@ -4,7 +4,7 @@
  TextScreen library. (C version)
      by Coffey (c)2015-2016
      
-     VERSION 20160402
+     VERSION 20160405
      
      Windows     : Win2K or later
      Non Windows : console support ANSI escape sequence
@@ -471,7 +471,7 @@ int TextScreen_GetKey(void) {
  Bitmap Draw Tools
  ********************************/
 
-void TextScreen_DrawFillCircle(const TextScreenBitmap *bitmap, int x, int y, int r, char ch)
+void TextScreen_DrawFillCircle(TextScreenBitmap *bitmap, int x, int y, int r, char ch)
 {
     int xd, yd, last_yd, last_xd;
     double m;
@@ -503,7 +503,7 @@ void TextScreen_DrawFillCircle(const TextScreenBitmap *bitmap, int x, int y, int
     }
 }
 
-void TextScreen_DrawCircle(const TextScreenBitmap *bitmap, int x, int y, int r, char ch, int clean)
+void TextScreen_DrawCircle(TextScreenBitmap *bitmap, int x, int y, int r, char ch, int mode)
 {
     int xd, yd, last_xd, last_yd;
     double m;
@@ -511,7 +511,11 @@ void TextScreen_DrawCircle(const TextScreenBitmap *bitmap, int x, int y, int r, 
     if (!bitmap) return;
     if (r < 0)   return;
     
-    if (clean)
+    if (mode == 1) {
+        TextScreen_DrawFillCircle(bitmap, x, y, r, ch);
+        return;
+    }
+    if (mode == 2)
         TextScreen_DrawFillCircle(bitmap, x, y, r, gSetting.space);
     
     xd = 0;
@@ -542,7 +546,7 @@ void TextScreen_DrawCircle(const TextScreenBitmap *bitmap, int x, int y, int r, 
     }
 }
 
-void TextScreen_DrawFillRect(const TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch)
+void TextScreen_DrawFillRect(TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch)
 {
     int xmin, xmax, ymin, ymax;
     int xc, yc;
@@ -565,11 +569,19 @@ void TextScreen_DrawFillRect(const TextScreenBitmap *bitmap, int x, int y, int w
     }
 }
 
-void TextScreen_DrawRect(const TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch, int clean)
+void TextScreen_DrawRect(TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch, int mode)
 {
     int xc, yc;
     
     if (!bitmap) return;
+    if (mode == 1) {
+        TextScreen_DrawFillRect(bitmap, x, y, w, h, ch);
+        return;
+    }
+    if (mode == 2) {
+        TextScreen_DrawFillRect(bitmap, x+1, y+1, w-2, h-2, gSetting.space); 
+    }
+    
     for (xc = x; xc < x + w; xc++) {
         TextScreen_PutCell(bitmap, xc, y        , ch);
         TextScreen_PutCell(bitmap, xc, y + h - 1, ch);
@@ -578,13 +590,14 @@ void TextScreen_DrawRect(const TextScreenBitmap *bitmap, int x, int y, int w, in
         TextScreen_PutCell(bitmap, x        , yc, ch);
         TextScreen_PutCell(bitmap, x + w - 1, yc, ch);
     }
-    
-    if (clean) {
-        TextScreen_DrawFillRect(bitmap, x+1, y+1, w-2, h-2, gSetting.space); 
-    }
 }
 
-void TextScreen_DrawFillRectP(const TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch)
+void TextScreen_DrawFillRectP(TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch)
+{
+    TextScreen_DrawRectP(bitmap, x, y, x1, y1, ch, 1);
+}
+
+void TextScreen_DrawRectP(TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch, int mode)
 {
     int xs, ys, w, h;
     
@@ -602,31 +615,10 @@ void TextScreen_DrawFillRectP(const TextScreenBitmap *bitmap, int x, int y, int 
         ys = y1;
         h  = y - y1 + 1;
     }
-    TextScreen_DrawFillRect(bitmap, xs, ys, w, h, ch);
+    TextScreen_DrawRect(bitmap, xs, ys, w, h, ch, mode);
 }
 
-void TextScreen_DrawRectP(const TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch, int clean)
-{
-    int xs, ys, w, h;
-    
-    if (x <= x1) {
-        xs = x;
-        w  = x1 - x + 1;
-    } else {
-        xs = x1;
-        w  = x - x1 + 1;
-    }
-    if (y <= y1) {
-        ys = y;
-        h  = y1 - y + 1;
-    } else {
-        ys = y1;
-        h  = y - y1 + 1;
-    }
-    TextScreen_DrawRect(bitmap, xs, ys, w, h, ch, clean);
-}
-
-void TextScreen_DrawLine(const TextScreenBitmap *bitmap, int x1, int y1, int x2, int y2, char ch)
+void TextScreen_DrawLine(TextScreenBitmap *bitmap, int x1, int y1, int x2, int y2, char ch)
 {
     int xd, yd;
     int xda, yda;
@@ -713,7 +705,7 @@ void TextScreen_DrawLine(const TextScreenBitmap *bitmap, int x1, int y1, int x2,
     }
 }
 
-void TextScreen_DrawText(const TextScreenBitmap *bitmap, int x, int y, const char *str)
+void TextScreen_DrawText(TextScreenBitmap *bitmap, int x, int y, char *str)
 {
     if (!bitmap) return;
     while (*str != '\0') {
@@ -723,7 +715,7 @@ void TextScreen_DrawText(const TextScreenBitmap *bitmap, int x, int y, const cha
     }
 }
 
-char TextScreen_GetCell(const TextScreenBitmap *bitmap, int x, int y)
+char TextScreen_GetCell(TextScreenBitmap *bitmap, int x, int y)
 {
     if (!bitmap) return 0;
     if ((x >= 0) && (x < bitmap->width) && (y >= 0) && (y < bitmap->height))
@@ -732,50 +724,46 @@ char TextScreen_GetCell(const TextScreenBitmap *bitmap, int x, int y)
         return 0;
 }
 
-void TextScreen_PutCell(const TextScreenBitmap *bitmap, int x, int y, char ch)
+void TextScreen_PutCell(TextScreenBitmap *bitmap, int x, int y, char ch)
 {
     if (!bitmap) return;
     if ((x >= 0) && (x < bitmap->width) && (y >= 0) && (y < bitmap->height))
         *(bitmap->data + y * bitmap->width + x) = ch;
 }
 
-void TextScreen_ClearCell(const TextScreenBitmap *bitmap, int x, int y)
+void TextScreen_ClearCell(TextScreenBitmap *bitmap, int x, int y)
 {
     if (!bitmap) return;
     if ((x >= 0) && (x < bitmap->width) && (y >= 0) && (y < bitmap->height))
         *(bitmap->data + y * bitmap->width + x) = gSetting.space;
 }
 
-void TextScreen_CopyRect(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, 
+void TextScreen_CopyRect(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, 
                          int dstx, int dsty, 
                          int srcx, int srcy, int srcw, int srch, 
                          int transparent)
 {
     int  x, y;
     char ch;
+    TextScreenBitmap *src, *dst, *tmp = NULL;
     
     if (!srcmap || !dstmap) return;
     
-    if (srcmap == dstmap) {  // duplicate bitmap when source = destinate
-        TextScreenBitmap *tempmap;
-        tempmap = TextScreen_DupBitmap(srcmap);
-        for (y = 0; y < srch; y++) {
-            for (x = 0; x < srcw; x++) {
-                ch = TextScreen_GetCell(tempmap, srcx + x, srcy + y);
-                if (ch != gSetting.space || !transparent)
-                    TextScreen_PutCell(dstmap, dstx + x, dsty + y, ch);
-            }
-        }
-        TextScreen_FreeBitmap(tempmap);
-    } else {
-        for (y = 0; y < srch; y++) {
-            for (x = 0; x < srcw; x++) {
-                ch = TextScreen_GetCell(srcmap, srcx + x, srcy + y);
-                if (ch != gSetting.space || !transparent)
-                    TextScreen_PutCell(dstmap, dstx + x, dsty + y, ch);
-            }
+    src = srcmap;
+    dst = dstmap;
+    if (src == dst) {  // duplicate bitmap when source = destinate
+        tmp = TextScreen_DupBitmap(src);
+        src = tmp;
+    }
+    for (y = 0; y < srch; y++) {
+        for (x = 0; x < srcw; x++) {
+            ch = TextScreen_GetCell(src, srcx + x, srcy + y);
+            if (ch != gSetting.space || !transparent)
+                TextScreen_PutCell(dst, dstx + x, dsty + y, ch);
         }
     }
+    if (tmp)
+        TextScreen_FreeBitmap(tmp);
 }
 
 /********************************
@@ -821,7 +809,7 @@ void TextScreen_FreeBitmap(TextScreenBitmap *bitmap)
     }
 }
 
-void TextScreen_CopyBitmap(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, int dx, int dy)
+void TextScreen_CopyBitmap(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, int dx, int dy)
 {
     int x, y;
     
@@ -834,7 +822,7 @@ void TextScreen_CopyBitmap(const TextScreenBitmap *dstmap, const TextScreenBitma
     }
 }
 
-TextScreenBitmap *TextScreen_DupBitmap(const TextScreenBitmap *bitmap)
+TextScreenBitmap *TextScreen_DupBitmap(TextScreenBitmap *bitmap)
 {
     TextScreenBitmap *newmap;
     
@@ -847,7 +835,7 @@ TextScreenBitmap *TextScreen_DupBitmap(const TextScreenBitmap *bitmap)
     return newmap;
 }
 
-void TextScreen_OverlayBitmap(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, int dx, int dy)
+void TextScreen_OverlayBitmap(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, int dx, int dy)
 {
     char ch;
     int x, y;
@@ -937,7 +925,7 @@ int TextScreen_ResizeBitmap(TextScreenBitmap *bitmap, int width, int height)
     return 0;
 }
 
-int TextScreen_CompareBitmap(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, int dx, int dy)
+int TextScreen_CompareBitmap(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, int dx, int dy)
 {
     int  x, y;
     char chsrc, chdst;
@@ -955,13 +943,13 @@ int TextScreen_CompareBitmap(const TextScreenBitmap *dstmap, const TextScreenBit
     return 0;
 }
 
-void TextScreen_ClearBitmap(const TextScreenBitmap *bitmap)
+void TextScreen_ClearBitmap(TextScreenBitmap *bitmap)
 {
     if (!bitmap) return;
     TextScreen_DrawFillRect(bitmap, 0, 0, bitmap->width, bitmap->height, gSetting.space);
 }
 
-int TextScreen_ShowBitmap(const TextScreenBitmap *bitmap, int dx, int dy)
+int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
 {
     char *buf;
     char ch;
@@ -1009,6 +997,7 @@ int TextScreen_ShowBitmap(const TextScreenBitmap *bitmap, int dx, int dy)
     fflush(stdout);
 #endif
     
+    // those 'change sign' is historical reason.
     dx = -dx;
     dy = -dy;
     

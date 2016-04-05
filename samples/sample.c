@@ -18,7 +18,7 @@ int main(void)
     TextScreen_Init(0);                       // Initialize
     TextScreen_SetSpaceChar('.');             // set space char to '.'
     bitmap = TextScreen_CreateBitmap(0, 0);   // create bitmap same size of screen
-    sprite = TextScreen_CreateBitmap(17, 9);  // create sprite1 bitmap. size(17,9)
+    sprite = TextScreen_CreateBitmap(17, 9);  // create sprite bitmap. size(17,9)
     TextScreen_DrawFillCircle(sprite, 8, 4, 4, '$');  // draw circle. center(8,4) r=4
     TextScreen_ClearScreen();                 // clear console
     
@@ -51,3 +51,4 @@ int main(void)
     TextScreen_End();                         // end of TextScreen
     return 0;
 }
+

@@ -14,7 +14,7 @@
 #ifndef TEXTSCREEN_TEXTSCREEN_H
 #define TEXTSCREEN_TEXTSCREEN_H
 
-#define TEXTSCREEN_TEXTSCREEN_VERSION 20160402
+#define TEXTSCREEN_TEXTSCREEN_VERSION 20160405
 
 // max bitmap width and height
 #define TEXTSCREEN_MAXSIZE 32768
@@ -125,40 +125,40 @@ int TextScreen_GetKey(void);
 
 // ******** bitmap draw tools ********
 // bitmap handle=bitmap; center position=(x,y); radius=r; draw character=ch
-void TextScreen_DrawFillCircle(const TextScreenBitmap *bitmap, int x, int y, int r, char ch);
+void TextScreen_DrawFillCircle(TextScreenBitmap *bitmap, int x, int y, int r, char ch);
 
-// bitmap handle=bitmap; center position=(x,y); radius=r; draw character=ch; clean flag=clean(0:none,1:fill space)
-void TextScreen_DrawCircle(const TextScreenBitmap *bitmap, int x, int y, int r, char ch, int clean);
+// bitmap handle=bitmap; center position=(x,y); radius=r; draw character=ch; mode(0:none,1:fill,2:fill space)
+void TextScreen_DrawCircle(TextScreenBitmap *bitmap, int x, int y, int r, char ch, int mode);
 
 // bitmap handle=bitmap; left=x; top=y; width=w; height=h; draw character=ch
-void TextScreen_DrawFillRect(const TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch);
+void TextScreen_DrawFillRect(TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch);
 
-// bitmap handle=bitmap; left=x; top=y; width=w; height=h; draw character=ch; clean flag=clean(0:none,1:fill space)
-void TextScreen_DrawRect(const TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch, int clean);
+// bitmap handle=bitmap; left=x; top=y; width=w; height=h; draw character=ch; mode(0:none,1:fill,2:fill space)
+void TextScreen_DrawRect(TextScreenBitmap *bitmap, int x, int y, int w, int h, char ch, int mode);
 
 // bitmap handle=bitmap; left=x; top=y; right=x1; bottom=y1; draw character=ch
-void TextScreen_DrawFillRectP(const TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch);
+void TextScreen_DrawFillRectP(TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch);
 
-// bitmap handle=bitmap; left=x; top=y; right=x1; bottom=y1; draw character=ch; clean flag=clean(0:none,1:fill space)
-void TextScreen_DrawRectP(const TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch, int clean);
+// bitmap handle=bitmap; left=x; top=y; right=x1; bottom=y1; draw character=ch; mode(0:none,1:fill,2:fill space)
+void TextScreen_DrawRectP(TextScreenBitmap *bitmap, int x, int y, int x1, int y1, char ch, int mode);
 
 // bitmap handle=bitmap; draw position(x1,y1) to (x2,y2); draw character=ch
-void TextScreen_DrawLine(const TextScreenBitmap *bitmap, int x1, int y1, int x2, int y2, char ch);
+void TextScreen_DrawLine(TextScreenBitmap *bitmap, int x1, int y1, int x2, int y2, char ch);
 
 // bitmap handle=bitmap; draw position(x,y); text string=str
-void TextScreen_DrawText(const TextScreenBitmap *bitmap, int x, int y, const char *str);
+void TextScreen_DrawText(TextScreenBitmap *bitmap, int x, int y, char *str);
 
 // bitmap handle=bitmap; get character at (x,y)
-char TextScreen_GetCell(const TextScreenBitmap *bitmap, int x, int y);
+char TextScreen_GetCell(TextScreenBitmap *bitmap, int x, int y);
 
 // bitmap handle=bitmap; put character ch to (x,y)
-void TextScreen_PutCell(const TextScreenBitmap *bitmap, int x, int y, char ch);
+void TextScreen_PutCell(TextScreenBitmap *bitmap, int x, int y, char ch);
 
 // bitmap handle=bitmap; clear (x,y)
-void TextScreen_ClearCell(const TextScreenBitmap *bitmap, int x, int y);
+void TextScreen_ClearCell(TextScreenBitmap *bitmap, int x, int y);
 
 // copy rectangle: destination bitmap=dstmap; source bitmap=srcmap; dst-pos=(dstx, dsty); src-pos and size=(srcx, srcy, srcw, srch);
-void TextScreen_CopyRect(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, 
+void TextScreen_CopyRect(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, 
                          int dstx, int dsty, int srcx, int srcy, int srcw, int srch, int transparent);
 
 
@@ -171,13 +171,13 @@ TextScreenBitmap *TextScreen_CreateBitmap(int width, int height);
 void TextScreen_FreeBitmap(TextScreenBitmap *bitmap);
 
 // copy srcmap to dstmap(dx, dy) (not create new bitmap)
-void TextScreen_CopyBitmap(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, int dx, int dy);
+void TextScreen_CopyBitmap(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, int dx, int dy);
 
 // duplicate bitmap handle (create new bitmap and copy)   Note: member 'exdata' will not duplicate cause unknown its size
-TextScreenBitmap *TextScreen_DupBitmap(const TextScreenBitmap *bitmap);
+TextScreenBitmap *TextScreen_DupBitmap(TextScreenBitmap *bitmap);
 
 // copy srcmap to dstmap(dx, dy) except null character
-void TextScreen_OverlayBitmap(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, int dx, int dy);
+void TextScreen_OverlayBitmap(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, int dx, int dy);
 
 // crop bitmap; position(x, y)  size=(w x h),  return 0:successful  -1:failed
 int TextScreen_CropBitmap(TextScreenBitmap *bitmap, int x, int y, int width, int height);
@@ -186,13 +186,13 @@ int TextScreen_CropBitmap(TextScreenBitmap *bitmap, int x, int y, int width, int
 int TextScreen_ResizeBitmap(TextScreenBitmap *bitmap, int width, int height);
 
 // compare srcmap and dstmap(dx, dy),  return 0:same   1,-1:different
-int TextScreen_CompareBitmap(const TextScreenBitmap *dstmap, const TextScreenBitmap *srcmap, int dx, int dy);
+int TextScreen_CompareBitmap(TextScreenBitmap *dstmap, TextScreenBitmap *srcmap, int dx, int dy);
 
 // clear bitmap (fill space character)
-void TextScreen_ClearBitmap(const TextScreenBitmap *bitmap);
+void TextScreen_ClearBitmap(TextScreenBitmap *bitmap);
 
 // show bitmap to console. position of bitmap(0,0) = console(dx,dy),  return 0:successful  -1:error
-int TextScreen_ShowBitmap(const TextScreenBitmap *bitmap, int dx, int dy);
+int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy);
 
 #endif
 
@@ -212,7 +212,7 @@ int main(void)
     TextScreen_Init(0);                       // Initialize
     TextScreen_SetSpaceChar('.');             // set space char to '.'
     bitmap = TextScreen_CreateBitmap(0, 0);   // create bitmap same size of screen
-    sprite = TextScreen_CreateBitmap(17, 9);  // create sprite1 bitmap. size(17,9)
+    sprite = TextScreen_CreateBitmap(17, 9);  // create sprite bitmap. size(17,9)
     TextScreen_DrawFillCircle(sprite, 8, 4, 4, '$');  // draw circle. center(8,4) r=4
     TextScreen_ClearScreen();                 // clear console
     
