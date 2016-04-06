@@ -14,7 +14,7 @@
 #ifndef TEXTSCREEN_TEXTSCREEN_H
 #define TEXTSCREEN_TEXTSCREEN_H
 
-#define TEXTSCREEN_TEXTSCREEN_VERSION 20160405
+#define TEXTSCREEN_TEXTSCREEN_VERSION 20160406
 
 // max bitmap width and height
 #define TEXTSCREEN_MAXSIZE 32768
@@ -27,6 +27,7 @@
 #define TSK_DEL           0x0000007F
 
 #define TSK_POSKEY        0x00010000
+#define TSK_FUNCKEY       0x00020000
 #define TSK_SHIFT         0x00100000
 #define TSK_CTRL          0x00200000
 #define TSK_ALT           0x00400000
@@ -43,8 +44,21 @@
 #define TSK_PAGEUP        0x00010049
 #define TSK_PAGEDOWN      0x00010051
 
+#define TSK_F1            0x00020041
+#define TSK_F2            0x00020042
+#define TSK_F3            0x00020043
+#define TSK_F4            0x00020044
+#define TSK_F5            0x00020045
+#define TSK_F6            0x00020046
+#define TSK_F7            0x00020047
+#define TSK_F8            0x00020048
+#define TSK_F9            0x00020049
+#define TSK_F10           0x0002004a
+#define TSK_F11           0x0002004b
+#define TSK_F12           0x0002004c
+
 #define TSK_KEYMASK       0x000FFFFF
-#define TSK_METAKEYMASK   0x00F00000
+#define TSK_MODKEYMASK    0x00F00000
 
 // rendering method (output method)
 enum TextScreenRenderingMethod {
@@ -70,6 +84,10 @@ typedef struct TextScreenSetting {
     double  sar;
     // rendering method
     int  renderingMethod;
+    // SIGINT callback handler
+    void (*sigintHandler)(int sig, void *userdata);
+    // SIGINT callback userdata
+    void *sigintHandlerUserData;
     // translate table
     char *translate;
 } TextScreenSetting;
@@ -85,6 +103,8 @@ typedef struct TextScreenBitmap {
     char *data;
 } TextScreenBitmap;
 
+// set SIGINT handler
+void TextScreen_SetSigintHandler(void (*handler)(int, void*), void *userdata);
 
 // initialize TextScreen library (NULL: use default setting)
 int TextScreen_Init(TextScreenSetting *usersetting);
@@ -95,7 +115,10 @@ int TextScreen_End(void);
 // clear console
 int TextScreen_ClearScreen(void);
 
-// get console size,  return  0: successful 1: error(could not get, width and height is set to default)
+// resize screen width, height (0,0):current console size
+int TextScreen_ResizeScreen(int width, int height);
+
+// get console size,  return  0: successful -1: error(could not get, width and height is set to default)
 int TextScreen_GetConsoleSize(int *width, int *height);
 
 // set cursor position (x, y),  (left, top) = (0, 0)
@@ -115,6 +138,9 @@ void TextScreen_SetSpaceChar(char ch);
 
 // get copy of current settings
 void TextScreen_GetSetting(TextScreenSetting *setting);
+
+// set settings  0:successful  -1:error
+int TextScreen_SetSetting(TextScreenSetting *setting);
 
 // get copy of default settings
 void TextScreen_GetSettingDefault(TextScreenSetting *setting);

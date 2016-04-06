@@ -1,11 +1,17 @@
-/******************************************
+/**********************************************************
  conway's game of life
      programming by Coffey   20151030
-               last modified 20160402
+               last modified 20160406
      for Windows, Linux(ubuntu)
- ******************************************/
 
-// snprintf
+ require:
+ textscree.c, textscreen.h (version >= 20160406)
+ 
+ build:
+ gcc life.c textscreen.c -Wall -lm -o life.exe (Windows)
+ gcc life.c textscreen.c -Wall -lm -o life.out (Linux)
+ **********************************************************/
+// use snprintf
 // #define _POSIX_C_SOURCE 200112L
 
 #include <stdio.h>
@@ -13,17 +19,24 @@
 #include <string.h>
 
 #ifdef _WIN32
+// include windows.h for Clipboard API
 #include <windows.h>
 #endif
 
+// default board size
 #define BOARD_SIZE_WIDTH   500
 #define BOARD_SIZE_HEIGHT  500
-#define VERSION_STR        "1.4"
+// version string
+#define VERSION_STR        "1.41"
 
 #define BOARD_SPACE_CHAR  '.'
 #define BOARD_ALIVE_CHAR  '#'
 
 #include "textscreen.h"
+
+#if TEXTSCREEN_TEXTSCREEN_VERSION < 20160406
+#error TextScreen version is too old. Build process aborted.
+#endif
 
 typedef struct Rect {
     int top;
@@ -45,6 +58,7 @@ typedef struct LifeParam {
     int  genCount;
     int  restartGenCount;
     int  pause;
+    int  quit;
     char aliveChar;
     Rect active;
     int  borderless;
@@ -53,9 +67,12 @@ typedef struct LifeParam {
     char name[256];
 } LifeParam;
 
+// -------------------------------------------------------------
+// set default rules to LifeParam
+// -------------------------------------------------------------
 void SetDefaultRules(LifeParam *lp)
 {
-    // set rule
+    // set default rule (B3/S23)
     lp->rule_alive[0] = 0;
     lp->rule_alive[1] = 0;
     lp->rule_alive[2] = 1;
@@ -77,6 +94,9 @@ void SetDefaultRules(LifeParam *lp)
     lp->rule_born[8] = 0;
 }
 
+// -------------------------------------------------------------
+// initialize LifeParam
+// -------------------------------------------------------------
 void InitLifeParam(LifeParam *lp)
 {
     int width  = BOARD_SIZE_WIDTH;
@@ -93,6 +113,7 @@ void InitLifeParam(LifeParam *lp)
     lp->restartGenCount = 0;
     lp->wait = 10;
     lp->pause = 0;
+    lp->quit = 0;
     lp->active.top = 0;
     lp->active.bottom = lp->bitmap->height - 1;
     lp->active.left = 0;
@@ -100,10 +121,10 @@ void InitLifeParam(LifeParam *lp)
     lp->borderless = 0;
     lp->name[0] = 0;
     
-    // set rule
+    // set default rule
     SetDefaultRules(lp);
     
-    // initial pattern (F)
+    // initial pattern (F-pentomino)
     TextScreen_PutCell(lp->bitmap, width / 2    , height / 2 - 1, lp->aliveChar);
     TextScreen_PutCell(lp->bitmap, width / 2 + 1, height / 2 - 1, lp->aliveChar);
     TextScreen_PutCell(lp->bitmap, width / 2 - 1, height / 2    , lp->aliveChar);
@@ -111,12 +132,19 @@ void InitLifeParam(LifeParam *lp)
     TextScreen_PutCell(lp->bitmap, width / 2    , height / 2 + 1, lp->aliveChar);
 }
 
-void FreeLifeParam(LifeParam *lp) {
+// -------------------------------------------------------------
+// free memory for LifeParam
+// -------------------------------------------------------------
+void FreeLifeParam(LifeParam *lp)
+{
     TextScreen_FreeBitmap(lp->bitmap);
     TextScreen_FreeBitmap(lp->storebitmap);
     TextScreen_FreeBitmap(lp->restartbitmap);
 }
 
+// -------------------------------------------------------------
+// detect alive region (rectangle).
+// -------------------------------------------------------------
 void CheckActive(LifeParam *lp)
 {
     int x, y;
@@ -139,6 +167,9 @@ void CheckActive(LifeParam *lp)
     if (lp->active.top > lp->active.bottom) lp->active.top = lp->active.bottom;
 }
 
+// -------------------------------------------------------------
+// make next generation pattern
+// -------------------------------------------------------------
 void NextGeneration(LifeParam *lp)
 {
     TextScreenBitmap *bitmapSrc, *bitmapDst;
@@ -210,7 +241,10 @@ void NextGeneration(LifeParam *lp)
     lp->genCount++;
 }
 
-void SaveToClipboard(LifeParam *lp)
+// -------------------------------------------------------------
+// Clipboard (Copy) (Clipboard action is currently Windows only)
+// -------------------------------------------------------------
+int SaveToClipboard(LifeParam *lp)
 {
 #ifdef _WIN32
     HGLOBAL cdata;
@@ -228,7 +262,7 @@ void SaveToClipboard(LifeParam *lp)
             for (y = 0; y < lp->bitmap->height; y++) {
                 for (x = 0; x < lp->bitmap->width; x++) {
                     cell = TextScreen_GetCell(lp->bitmap, x, y);
-                    p[index++] = cell;
+                    p[index++] = (cell == lp->aliveChar ? '#' : cell);
                 }
                 p[index++] = 0x0d;
                 p[index++] = 0x0a;
@@ -243,10 +277,17 @@ void SaveToClipboard(LifeParam *lp)
         }
         CloseClipboard();
     }
+    return 0;
 #else
+    return 0;
 #endif
 }
 
+// -------------------------------------------------------------
+// Parse RLE format (ignore header)
+// The rule assumes B3/S23
+// See http://www.conwaylife.com/wiki/RLE
+// -------------------------------------------------------------
 void ParseRLE(LifeParam *lp, char *rletext)
 {
     int index = 0;
@@ -320,6 +361,11 @@ void ParseRLE(LifeParam *lp, char *rletext)
     }
 }
 
+// -------------------------------------------------------------
+// parse plain text
+// This code can read Plaintext format of  http://www.conwaylife.com/wiki/Main_Page
+// and clipboard data made by this program.
+// -------------------------------------------------------------
 void ParsePlainText(LifeParam *lp, char *plaintext)
 {
     int index = 0;
@@ -336,7 +382,7 @@ void ParsePlainText(LifeParam *lp, char *plaintext)
                 break;
             case 0x0d:
                 break;
-            case 'O':   // for  http://www.conwaylife.com/wiki/Main_Page   plain text pattern
+            case 'O':   // for http://www.conwaylife.com/wiki/Plaintext
             case '#':
                 TextScreen_PutCell(lp->bitmap, x, y, lp->aliveChar);
                 x++;
@@ -362,6 +408,9 @@ void ParsePlainText(LifeParam *lp, char *plaintext)
     }
 }
 
+// -------------------------------------------------------------
+// Clipboard (Paste) (Clipboard action is currently Windows only)
+// -------------------------------------------------------------
 int LoadFromClipboard(LifeParam *lp)
 {
 #ifdef _WIN32
@@ -397,6 +446,8 @@ int LoadFromClipboard(LifeParam *lp)
         
         rle = 0;
         index = 0;
+        // check header
+        // plain text or 'http://www.conwaylife.com/wiki/' s RLE,plain format
         while(localdata[index]) {
             if((localdata[index] == '#') || (localdata[index] == '!')) {
                 while((localdata[index] != 0) && (localdata[index] != 0x0a)) {
@@ -413,6 +464,7 @@ int LoadFromClipboard(LifeParam *lp)
             index++;
         }
         
+        // parse data
         TextScreen_ClearBitmap(lp->bitmap);
         if (rle) {
             ParseRLE(lp, localdata);
@@ -420,6 +472,7 @@ int LoadFromClipboard(LifeParam *lp)
             ParsePlainText(lp, localdata);
         }
         
+        // loaded pattern move to center of bitmap
         CheckActive(lp);
         tempbitmap = TextScreen_DupBitmap(lp->bitmap);
         TextScreen_ClearBitmap(lp->bitmap);
@@ -437,8 +490,12 @@ int LoadFromClipboard(LifeParam *lp)
 #endif
 }
 
-void PrintHelp(void) {
+// -------------------------------------------------------------
+// print help text
+// -------------------------------------------------------------
+void PrintHelp(LifeParam *lp) {
     TextScreen_ClearScreen();
+    TextScreen_SetCursorVisible(0);
     printf("\n\n");
     printf("  version info:\n");
     printf("  conways_game_of_life by Coffey 2015-2016\n");
@@ -461,15 +518,20 @@ void PrintHelp(void) {
     printf("\n");
     printf("  hit any key\n");
     fflush(stdout);
-    {
+    {  // wait any key
         int key = 0;
         while (!key) {
             key = TextScreen_GetKey();
             TextScreen_Wait(50);
+            if (lp->quit) break;
         }
     }
+    TextScreen_SetCursorVisible(0);
 }
 
+// -------------------------------------------------------------
+// Set Rules
+// -------------------------------------------------------------
 void SetRule(LifeParam *lp)
 {
     int i, quit;
@@ -477,9 +539,11 @@ void SetRule(LifeParam *lp)
     int curoffsetx, curoffsety;
     
     TextScreen_ClearScreen();
+    TextScreen_SetCursorVisible(1);
     
     TextScreen_SetCursorPos(0,2);
-    printf("  Edit Alive/Born rules.\n\n");
+    printf("  Edit Alive/Born rules.\n");
+    printf("\n");
     printf("                012345678\n");
     printf("  ------------------------\n");
     printf("  Stays alive : ");
@@ -502,16 +566,16 @@ void SetRule(LifeParam *lp)
     curoffsety = 6;
     TextScreen_SetCursorPos(curoffsetx + curx, curoffsety + cury);
     quit = 0;
-    while (!quit) {
+    while (!quit && !lp->quit) {
         int  key;
         key = TextScreen_GetKey() & TSK_KEYMASK;
         if (key) {
             switch (key) {
-                case 'u':
+                case 'u':  // exit edit
                 case TSK_ENTER:
                     quit = 1;
                     break;
-                case ' ':
+                case ' ':  // toggle rule
                     switch (cury) {
                         case 0:
                             lp->rule_alive[curx] = !(lp->rule_alive[curx]);
@@ -525,7 +589,7 @@ void SetRule(LifeParam *lp)
                             break;
                     }
                     break;
-                case 'd':
+                case 'd':  // load default rules
                     SetDefaultRules(lp);
                     TextScreen_SetCursorPos(curoffsetx + 0, curoffsety + 0);
                     for (i = 0; i < 9; i++) {
@@ -537,45 +601,52 @@ void SetRule(LifeParam *lp)
                     }
                     TextScreen_SetCursorPos(curoffsetx + curx, curoffsety + cury);
                     break;
-                case TSK_ARROW_UP:  // up
+                case TSK_ARROW_UP:     // cursor up
                     cury--;
                     if (cury < 0) cury = 0;
                     break;
-                case TSK_ARROW_DOWN:  // down
+                case TSK_ARROW_DOWN:   // cursor down
                     cury++;
                     if (cury > 1) cury = 1;
                     break;
-                case TSK_ARROW_LEFT:  // left
+                case TSK_ARROW_LEFT:   // cursor left
                     curx--;
                     if (curx < 0) curx = 0;
                     break;
-                case TSK_ARROW_RIGHT:  // right
+                case TSK_ARROW_RIGHT:  // cursor right
                     curx++;
                     if (curx > 8) curx = 8;
                     break;
             }
             TextScreen_SetCursorPos(curoffsetx + curx, curoffsety + cury);
         }
-        TextScreen_Wait(5);
+        TextScreen_Wait(10);
     }
+    TextScreen_SetCursorVisible(0);
 }
 
+// -------------------------------------------------------------
+// set board size
+// -------------------------------------------------------------
 void SetBoardSize(LifeParam *lp)
 {
     int quit;
     int cury;
     int curoffsetx, curoffsety;
+    int n[2];
     int width, height;
     
     TextScreen_ClearScreen();
+    TextScreen_SetCursorVisible(1);
     
-    width  = lp->bitmap->width;
-    height = lp->bitmap->height;
+    n[0] = lp->bitmap->width;
+    n[1] = lp->bitmap->height;
     
     TextScreen_SetCursorPos(0,2);
-    printf("  Edit field size.\n\n");
-    printf("  Width  : %5d\n", width);
-    printf("  Height : %5d\n", height);
+    printf("  Edit field size.\n");
+    printf("\n");
+    printf("  Width  : %5d\n", n[0]);
+    printf("  Height : %5d\n", n[1]);
     printf("\n");
     printf("\n");
     printf("  [arrow Up/Down]select\n");
@@ -589,73 +660,69 @@ void SetBoardSize(LifeParam *lp)
     curoffsety = 4;
     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
     quit = 0;
-    while (!quit) {
+    while (!quit && !lp->quit) {
         int key;
         key = TextScreen_GetKey() & TSK_KEYMASK;
         if (key) {
             switch (key) {
-                case 'y':
+                case 'y':  // exit edit
                 case TSK_ENTER:
                     quit = 1;
                     break;
-                case 'd':
-                    width  = BOARD_SIZE_WIDTH;
-                    height = BOARD_SIZE_HEIGHT;
-                    TextScreen_SetCursorPos(0,4);
-                    printf("  Width  : %5d\n", width);
-                    printf("  Height : %5d\n", height);
+                case 'd':  // default size
+                    n[0] = BOARD_SIZE_WIDTH;
+                    n[1] = BOARD_SIZE_HEIGHT;
+                    TextScreen_SetCursorVisible(0);
+                    TextScreen_SetCursorPos(0, curoffsety);
+                    printf("  Width  : %5d\n", n[0]);
+                    printf("  Height : %5d\n", n[1]);
+                    TextScreen_SetCursorVisible(1);
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     break;
-                case TSK_ARROW_UP:  // up
+                case TSK_ARROW_UP:  // cursor up
                     cury--;
                     if (cury < 0) cury = 0;
                     break;
-                case TSK_ARROW_DOWN:  // down
+                case TSK_ARROW_DOWN:  // cursor down
                     cury++;
                     if (cury > 1) cury = 1;
                     break;
-                case TSK_PAGEDOWN:  // page down
+                case TSK_PAGEDOWN:    // page down
                 case TSK_ARROW_LEFT:  // left
-                    if (cury) {
-                        height -= (key == TSK_ARROW_LEFT) + (key == TSK_PAGEDOWN)*50;
-                        if (height < 10) height = 10;
-                        TextScreen_SetCursorPos(0,5);
-                        printf("  Height : %5d\n", height);
-                    } else {
-                        width -= (key == TSK_ARROW_LEFT) + (key == TSK_PAGEDOWN)*50;
-                        if (width < 10) width = 10;
-                        TextScreen_SetCursorPos(0,4);
-                        printf("  Width  : %5d\n", width);
+                case TSK_PAGEUP:      // page up
+                case TSK_ARROW_RIGHT: // right
+                    n[cury] += (key == TSK_ARROW_RIGHT) + (key == TSK_PAGEUP) * 50
+                              -(key == TSK_ARROW_LEFT) - (key == TSK_PAGEDOWN) * 50;
+                    if ((key == TSK_PAGEUP) || (key == TSK_PAGEDOWN)) {
+                        n[cury] += (key == TSK_PAGEDOWN) * 49;
+                        n[cury] = n[cury] - (n[cury] % 50);
                     }
-                    break;
-                case TSK_PAGEUP:  // page up
-                case TSK_ARROW_RIGHT:  // right
-                    if (cury) {
-                        height += (key == TSK_ARROW_RIGHT) + (key == TSK_PAGEUP)*50;
-                        if (height > 10000) height = 10000;
-                        TextScreen_SetCursorPos(0,5);
-                        printf("  Height : %5d\n", height);
-                    } else {
-                        width += (key == TSK_ARROW_RIGHT) + (key == TSK_PAGEUP)*50;
-                        if (width > 10000) width = 10000;
-                        TextScreen_SetCursorPos(0,4);
-                        printf("  Width  : %5d\n", width);
-                    }
+                    if (n[cury] < 10) n[cury] = 10;
+                    if (n[cury] > 10000) n[cury] = 10000;
+                    TextScreen_SetCursorVisible(0);
+                    TextScreen_SetCursorPos(0, curoffsety);
+                    printf("  Width  : %5d\n", n[0]);
+                    printf("  Height : %5d\n", n[1]);
+                    TextScreen_SetCursorVisible(1);
                     break;
             }
             TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
         }
-        TextScreen_Wait(5);
+        TextScreen_Wait(10);
     }
     
+    width  = n[0];
+    height = n[1];
     if ((lp->bitmap->width != width) || (lp->bitmap->height != height)) {
         TextScreenBitmap *bitmap;
         
+        // change view offset
         lp->offsetx = lp->offsetx - (lp->bitmap->width - lp->setting.width) / 2
                                   + (width - lp->setting.width) / 2;
         lp->offsety = lp->offsety - (lp->bitmap->height - lp->setting.height) / 2
                                   + (height - lp->setting.height) / 2;
         
+        // resize internal bitmap (bitmap, storebitmap, restartbitmap)
         bitmap = TextScreen_CreateBitmap(width, height);
         TextScreen_CopyBitmap(bitmap, lp->bitmap,
                         (width - lp->bitmap->width) / 2,
@@ -679,8 +746,12 @@ void SetBoardSize(LifeParam *lp)
         
         CheckActive(lp);
     }
+    TextScreen_SetCursorVisible(0);
 }
 
+// -------------------------------------------------------------
+// load preset pattern
+// -------------------------------------------------------------
 void LoadPreset(LifeParam *lp)
 {
     int quit;
@@ -689,6 +760,7 @@ void LoadPreset(LifeParam *lp)
     int max;
     
     TextScreen_ClearScreen();
+    TextScreen_SetCursorVisible(1);
     
     max = 10;
     TextScreen_SetCursorPos(0,2);
@@ -715,20 +787,20 @@ void LoadPreset(LifeParam *lp)
     printf("@");
     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
     quit = 0;
-    while (!quit) {
+    while (!quit && !lp->quit) {
         int key;
         key = TextScreen_GetKey() & TSK_KEYMASK;
         if (key) {
             switch (key) {
-                case TSK_ESC:
+                case TSK_ESC:  // exit without load
                     cury = 0;
                     quit = 1;
                     break;
-                case 'p':
+                case 'p':  // load current select and exit
                 case TSK_ENTER:
                     quit = 1;
                     break;
-                case TSK_ARROW_UP:  // up
+                case TSK_ARROW_UP:  // cursor up
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     printf(" ");
                     cury--;
@@ -736,7 +808,7 @@ void LoadPreset(LifeParam *lp)
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     printf("@");
                     break;
-                case TSK_ARROW_DOWN:  // down
+                case TSK_ARROW_DOWN:  // cursor down
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     printf(" ");
                     cury++;
@@ -747,23 +819,23 @@ void LoadPreset(LifeParam *lp)
             }
             TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
         }
-        TextScreen_Wait(5);
+        TextScreen_Wait(10);
     }
     if (cury) {
         int y = 0;
         TextScreen_ClearBitmap(lp->bitmap);
         switch (cury) {
-            case 1:
+            case 1:  // F(R) pentomino
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".##");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "##");
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".#");
                 break;
-            case 2:
+            case 2:  // Glider
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "..#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "###");
                 break;
-            case 3:
+            case 3: // Spaceship
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".........................#..#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".............................#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "...............#.........#...#");
@@ -781,7 +853,7 @@ void LoadPreset(LifeParam *lp)
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".........................#...#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "..........................####");
                 break;
-            case 4:
+            case 4:  // Spaceship Crash
                 TextScreen_DrawText(lp->bitmap, 0, y++, "..#.........................................#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "#...#.....................................#...#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".....#...................................#");
@@ -795,17 +867,17 @@ void LoadPreset(LifeParam *lp)
                 // TextScreen_DrawText(lp->bitmap, 0, y++, ".......#...#.......................#...#");
                 // TextScreen_DrawText(lp->bitmap, 0, y++, "........####.......................####");
                 break;
-            case 5:
+            case 5:  // Diehard
                 TextScreen_DrawText(lp->bitmap, 0, y++, "......#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "##");
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".#...###");
                 break;
-            case 6:
+            case 6:  // Acom
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "...#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "##..###");
                 break;
-            case 7:
+            case 7:  // Gosper Glider Gun
                 TextScreen_DrawText(lp->bitmap, 0, y++, "........................#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "......................#.#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "............##......##");
@@ -816,7 +888,7 @@ void LoadPreset(LifeParam *lp)
                 TextScreen_DrawText(lp->bitmap, 0, y++, "...........#...#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "............##");
                  break;
-            case 8:
+            case 8:  // Pulsar
                 TextScreen_DrawText(lp->bitmap, 0, y++, "..###...###");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.#....#");
@@ -831,7 +903,7 @@ void LoadPreset(LifeParam *lp)
                 TextScreen_DrawText(lp->bitmap, 0, y++, "");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "..###...###");
                 break;
-            case 9:
+            case 9:  // Kok's Galaxy
                 TextScreen_DrawText(lp->bitmap, 0, y++, "######.##");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "######.##");
                 TextScreen_DrawText(lp->bitmap, 0, y++, ".......##");
@@ -842,7 +914,7 @@ void LoadPreset(LifeParam *lp)
                 TextScreen_DrawText(lp->bitmap, 0, y++, "##.######");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "##.######");
                 break;
-            case 10:
+            case 10:  // Pentadecathlon
                 TextScreen_DrawText(lp->bitmap, 0, y++, "..#....#");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "##.####.##");
                 TextScreen_DrawText(lp->bitmap, 0, y++, "..#....#");
@@ -872,8 +944,12 @@ void LoadPreset(LifeParam *lp)
             TextScreen_FreeBitmap(tempbitmap);
         }
     }
+    TextScreen_SetCursorVisible(0);
 }
 
+// -------------------------------------------------------------
+// check resize console (return 1=resized, 0=no resize)
+// -------------------------------------------------------------
 int ResizeConsole(LifeParam *lp)
 {
     int width, height;
@@ -890,45 +966,62 @@ int ResizeConsole(LifeParam *lp)
     
     lp->consoleWidth = width;
     lp->consoleHeight = height;
-    TextScreen_GetSettingDefault(&setting);
-    setting.space = BOARD_SPACE_CHAR;
+    TextScreen_ResizeScreen(0, 0);
+    TextScreen_GetSetting(&setting);
     lp->setting = setting;
-    TextScreen_Init(&(lp->setting));
     
+    // set new view offset
     lp->offsetx = lp->offsetx - (lp->bitmap->width - saveWidth) / 2
                               + (lp->bitmap->width - lp->setting.width) / 2;
     lp->offsety = lp->offsety - (lp->bitmap->height - saveHeight) / 2
                               + (lp->bitmap->height - lp->setting.height) / 2;
     
+    TextScreen_ClearScreen();
+    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
+    
     return 1;
 }
 
+// -------------------------------------------------------------
+// edit board
+// -------------------------------------------------------------
 void EditBoard(LifeParam *lp)
 {
     int quit = 0;
     int curx, cury;
 #ifdef _WIN32
-    char *helptext = " [space]toggle [Enter]start [x]clear [v]paste [r]read [s]store [h]help ";
+    char *helptext = "  [space]toggle [Enter]start [x]clear [v]paste [r]read [s]store [h]help";
 #else
-    char *helptext = " [space]toggle [Enter]start [x]clear [r]read [s]store [h]help ";
+    char *helptext = "  [space]toggle [Enter]start [x]clear [r]read [s]store [h]help         ";
 #endif
 
+#define EDITBOARD_SHOWCENTER() {  \
+    lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;     \
+    lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;   \
+    curx = lp->setting.width / 2 + lp->setting.leftMargin;         \
+    cury = lp->setting.height / 2 + lp->setting.topMargin;         \
+    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety); \
+}
+#define  EDITBOARD_SHOWHELPLINE() {  \
+    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);  \
+    printf("%s", helptext);                                                  \
+    fflush(stdout);                                                          \
+}
+
+    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
+    EDITBOARD_SHOWHELPLINE();
     curx = lp->setting.width / 2 + lp->setting.leftMargin;
     cury = lp->setting.height / 2 + lp->setting.topMargin;
-    
-    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
-    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
-    printf("%s", helptext);
-    fflush(stdout);
     TextScreen_SetCursorPos(curx, cury);
+    TextScreen_SetCursorVisible(1);
     
-    while (!quit) {
+    while (!quit && !lp->quit) {
         int  key;
         key = TextScreen_GetKey() & TSK_KEYMASK;
         if (key) {
             switch (key) {
                 case TSK_ENTER:  // (enter key) start life
-                case 'e':
+                case 'e':  // exit edit mode
                     CheckActive(lp);
                     TextScreen_CopyBitmap(lp->restartbitmap, lp->bitmap, 0, 0);
                     lp->restartGenCount = lp->genCount;
@@ -936,71 +1029,51 @@ void EditBoard(LifeParam *lp)
                     TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
                     printf("                                                                          ");
                     break;
-                case 'q':  // quit
-                    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
-                    printf("\n");
-                    fflush(stdout);
-                    FreeLifeParam(lp);
-                    // TextScreen_ClearScreen();
-                    TextScreen_End();
-                    exit(0);
+                // case TSK_ESC:  // esc key
+                case 'q':  // quit program
+                    quit = 1;
+                    lp->quit = 1;
                     break;
-                case 'c':
+                case 'c':  // copy to clipboard
                     SaveToClipboard(lp);
                     break;
                 case 'u':  // change rule
                     SetRule(lp);
+                    TextScreen_SetCursorVisible(1);
                     TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
-                    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
-                    printf("%s", helptext);
+                    EDITBOARD_SHOWHELPLINE();
                     break;
-                case 'y':
+                case 'y':  // edit board size
                     SetBoardSize(lp);
+                    TextScreen_SetCursorVisible(1);
                     TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
-                    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
-                    printf("%s", helptext);
+                    EDITBOARD_SHOWHELPLINE();
                     break;
-                case 'v':
+                case 'v':  // load from clipboard (paste)
                     if (LoadFromClipboard(lp)) {
                         lp->genCount = 0;
-                        lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;
-                        lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;
-                        curx = lp->setting.width / 2 + lp->setting.leftMargin;
-                        cury = lp->setting.height / 2 + lp->setting.topMargin;
-                        TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
+                        EDITBOARD_SHOWCENTER();
                     }
                     break;
                 case 'x':  // clear all
                     TextScreen_ClearBitmap(lp->bitmap);
                     lp->genCount = 0;
-                    lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;
-                    lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;
-                    curx = lp->setting.width / 2 + lp->setting.leftMargin;
-                    cury = lp->setting.height / 2 + lp->setting.topMargin;
-                    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
+                    EDITBOARD_SHOWCENTER();
                     break;
                 case 'r':  // read
                     TextScreen_CopyBitmap(lp->bitmap, lp->storebitmap, 0, 0);
                     lp->genCount = 0;
-                    lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;
-                    lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;
-                    curx = lp->setting.width / 2 + lp->setting.leftMargin;
-                    cury = lp->setting.height / 2 + lp->setting.topMargin;
-                    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
+                    EDITBOARD_SHOWCENTER();
                     break;
                 case 's':  // store
                     TextScreen_CopyBitmap(lp->storebitmap, lp->bitmap, 0, 0);
                     break;
-                case 'p':
+                case 'p':  // load preset pattern
                     LoadPreset(lp);
+                    TextScreen_SetCursorVisible(1);
                     lp->genCount = 0;
-                    lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;
-                    lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;
-                    curx = lp->setting.width / 2 + lp->setting.leftMargin;
-                    cury = lp->setting.height / 2 + lp->setting.topMargin;
-                    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
-                    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
-                    printf("%s", helptext);
+                    EDITBOARD_SHOWCENTER();
+                    EDITBOARD_SHOWHELPLINE();
                     break;
                 case ' ':  // toggle cell
                     {
@@ -1015,13 +1088,13 @@ void EditBoard(LifeParam *lp)
                         TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                     }
                     break;
-                case 'h':
-                    PrintHelp();
+                case 'h':  // show help
+                    PrintHelp(lp);
+                    TextScreen_SetCursorVisible(1);
                     TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
-                    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
-                    printf("%s", helptext);
+                    EDITBOARD_SHOWHELPLINE();
                     break;
-                case TSK_ARROW_UP:  // up
+                case TSK_ARROW_UP:  // cursor up
                     cury--;
                     if (cury < lp->setting.topMargin) {
                         cury = lp->setting.topMargin;
@@ -1029,7 +1102,7 @@ void EditBoard(LifeParam *lp)
                         TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                     }
                     break;
-                case TSK_ARROW_DOWN:  // down
+                case TSK_ARROW_DOWN:  // cursor down
                     cury++;
                     if (cury >= lp->setting.height + lp->setting.topMargin) {
                         cury = lp->setting.height + lp->setting.topMargin - 1;
@@ -1037,7 +1110,7 @@ void EditBoard(LifeParam *lp)
                         TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                     }
                     break;
-                case TSK_ARROW_LEFT:  // left
+                case TSK_ARROW_LEFT:  // cursor left
                     curx--;
                     if (curx < lp->setting.leftMargin) {
                         curx = lp->setting.leftMargin;
@@ -1045,7 +1118,7 @@ void EditBoard(LifeParam *lp)
                         TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                     }
                     break;
-                case TSK_ARROW_RIGHT:  // right
+                case TSK_ARROW_RIGHT:  // cursor right
                     curx++;
                     if (curx >= lp->setting.width + lp->setting.leftMargin) {
                         curx = lp->setting.width + lp->setting.leftMargin - 1;
@@ -1058,11 +1131,7 @@ void EditBoard(LifeParam *lp)
                 case TSK_PAGEDOWN:  // page down
                     break;
                 case TSK_HOME:  // home (view center)
-                    lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;
-                    lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;
-                    curx = lp->setting.width / 2 + lp->setting.leftMargin;
-                    cury = lp->setting.height / 2 + lp->setting.topMargin;
-                    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
+                    EDITBOARD_SHOWCENTER();
                     break;
             }
             TextScreen_SetCursorPos(curx, cury);
@@ -1070,41 +1139,45 @@ void EditBoard(LifeParam *lp)
         if (ResizeConsole(lp)) {
             TextScreen_ClearScreen();
             TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
-            TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
-            printf("%s", helptext);
-            fflush(stdout);
+            EDITBOARD_SHOWHELPLINE();
             curx = lp->setting.width / 2 + lp->setting.leftMargin;
             cury = lp->setting.height / 2 + lp->setting.topMargin;
             TextScreen_SetCursorPos(curx, cury);
         }
-        TextScreen_Wait(5);
+        TextScreen_Wait(10);
     }
+    TextScreen_SetCursorVisible(0);
 }
 
+// -------------------------------------------------------------
+// main loop keyboard check (return key code)
+// -------------------------------------------------------------
 int KeyboardCheck(LifeParam *lp)
 {
-    int quit = 0;
     int key;
     
     key = TextScreen_GetKey() & TSK_KEYMASK;
     if (key) {
         switch (key) {
+            // case TSK_ESC:  // esc key
             case 'q':  // quit
                 printf("\n");
-                quit = 1;
+                lp->quit = 1;
                 break;
-            case 'f':  // fast
+            case 'f':  // fast: decrease wait
+            case TSK_PAGEUP:  // page up(fast: decrease wait)
                 lp->wait -= 1;
                 if (lp->wait < 0) lp->wait = 0;
                 break;
-            case 's':  // slow
+            case 's':  // slow: increase wait
+            case TSK_PAGEDOWN:  // page down(slow: increase wait)
                 lp->wait += 1;
                 if (lp->wait > 100) lp->wait = 100;
                 break;
             case ' ':  // pause
                 lp->pause = (!(lp->pause));
                 break;
-            case 'n':
+            case 'n':  // next generation (use when pause)
                 NextGeneration(lp);
                 TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                 break;
@@ -1118,7 +1191,7 @@ int KeyboardCheck(LifeParam *lp)
                 SetRule(lp);
                 TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                 break;
-            case 'y':
+            case 'y':  // edit board size
                 SetBoardSize(lp);
                 TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                 break;
@@ -1126,14 +1199,14 @@ int KeyboardCheck(LifeParam *lp)
             case 0x0d:
                 EditBoard(lp);
                 break;
-            case 'h':
-                PrintHelp();
+            case 'h':  // show help
+                PrintHelp(lp);
                 TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                 break;
-            case 'c':
+            case 'c':  // copy (clipboard)
                 SaveToClipboard(lp);
                 break;
-            case 'b':
+            case 'b':  // toggle borderless mode
                 lp->borderless = (!(lp->borderless));
                 break;
             case TSK_ARROW_UP:  // up
@@ -1152,14 +1225,6 @@ int KeyboardCheck(LifeParam *lp)
                 lp->offsetx += 5;
                 TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                 break;
-            case TSK_PAGEUP:  // page up(fast)
-                lp->wait -= 1;
-                if (lp->wait < 0) lp->wait = 0;
-                break;
-            case TSK_PAGEDOWN:  // page down(slow)
-                lp->wait += 1;
-                if (lp->wait > 100) lp->wait = 100;
-                break;
             case TSK_HOME:  // home (view center)
                 lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;
                 lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;
@@ -1167,27 +1232,60 @@ int KeyboardCheck(LifeParam *lp)
                 break;
         }
     }
-    return quit;
+    return key;
 }
 
+// -------------------------------------------------------------
+// draw status line
+// -------------------------------------------------------------
+void DrawStatusLine(LifeParam *lp)
+{
+    TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);
+    printf("  Gen %6d  View(%d,%d)  Wait %dms %s %s    [h]help            ", lp->genCount,
+            lp->offsetx - (lp->bitmap->width - lp->setting.width) / 2,
+            lp->offsety - (lp->bitmap->height - lp->setting.height) / 2,
+            lp->wait * 10,
+            lp->borderless ? "BL": "  ",
+            lp->pause ? "Pause": "     ");
+    fflush(stdout);
+}
+
+// -------------------------------------------------------------
+// interrupt handler (press Ctrl+C)
+// -------------------------------------------------------------
+void SigintHandler(int sig, void *userdata)
+{
+    LifeParam *lp;
+    
+    lp = (LifeParam *)userdata;
+    lp->quit = 1;
+}
+
+// -------------------------------------------------------------
+// main entry
+// -------------------------------------------------------------
 int main(void)
 {
     LifeParam lp;
     int waitCount;
     
-    TextScreen_GetSettingDefault(&lp.setting);
-    lp.setting.space = BOARD_SPACE_CHAR;
-    TextScreen_Init(&lp.setting);
+    // initialize TextScreen
+    TextScreen_Init(NULL);
+    TextScreen_SetSpaceChar(BOARD_SPACE_CHAR);
+    TextScreen_GetSetting(&lp.setting);
+    // set interrupt hander (Ctrl+C)
+    TextScreen_SetSigintHandler(SigintHandler, (void *)&lp);
     TextScreen_ClearScreen();
-    TextScreen_SetCursorVisible(1);
+    TextScreen_SetCursorVisible(0);
     
+    // initialize board
     InitLifeParam(&lp);
+    
+    // edit board
     EditBoard(&lp);
     
-    TextScreen_ShowBitmap(lp.bitmap, -lp.offsetx, -lp.offsety);
-    
     waitCount = lp.wait;
-    while (1) {
+    while (!lp.quit) {
         if ((waitCount <= 0) && (!lp.pause)) {
             NextGeneration(&lp);
             TextScreen_ShowBitmap(lp.bitmap, -lp.offsetx, -lp.offsety);
@@ -1197,27 +1295,25 @@ int main(void)
             waitCount--;
         }
         
-        if (ResizeConsole(&lp)) {
-            TextScreen_ClearScreen();
-            TextScreen_ShowBitmap(lp.bitmap, -lp.offsetx, -lp.offsety);
-        }
-        
-        TextScreen_SetCursorPos(0, lp.setting.height + lp.setting.topMargin);
-        printf(" Gen %6d  View(%d,%d)  Wait %dms %s %s    [h]help             ", lp.genCount,
-                lp.offsetx - (lp.bitmap->width - lp.setting.width) / 2,
-                lp.offsety - (lp.bitmap->height - lp.setting.height) / 2,
-                lp.wait * 10,
-                lp.borderless ? "BL": "  ",
-                lp.pause ? "Pause": "     ");
-        fflush(stdout);
-        
-        if (KeyboardCheck(&lp)) {
-            break;
-        }
+        // console resize check
+        ResizeConsole(&lp);
+        // draw status line
+        DrawStatusLine(&lp);
+        // key check
+        KeyboardCheck(&lp);
     }
+    
+    // move cursor to end of line, and 2 scrolls
+    TextScreen_SetCursorPos(0, lp.consoleHeight - 1);
+    printf("\n");
+    TextScreen_Wait(50);
+    printf("\n");
     fflush(stdout);
+    // free board
     FreeLifeParam(&lp);
+    // free TextScreen
     TextScreen_End();
+    
     return 0;
 }
 

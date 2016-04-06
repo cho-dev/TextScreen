@@ -4,7 +4,7 @@
  TextScreen library. (C version)
      by Coffey (c)2015-2016
      
-     VERSION 20160405
+     VERSION 20160406
      
      Windows     : Win2K or later
      Non Windows : console support ANSI escape sequence
@@ -70,6 +70,115 @@ struct KeySequence {
 };
 
 #ifdef _WIN32
+static struct KeySequence gKeyScanWin [] = { // Windows
+    { TSK_ARROW_LEFT,   2, { 0xe0, 0x4B, 0x00 }},
+    { TSK_ARROW_RIGHT,  2, { 0xe0, 0x4D, 0x00 }},
+    { TSK_ARROW_UP,     2, { 0xe0, 0x48, 0x00 }},
+    { TSK_ARROW_DOWN,   2, { 0xe0, 0x50, 0x00 }},
+    { TSK_INSERT,       2, { 0xe0, 0x52, 0x00 }},
+    { TSK_DELETE,       2, { 0xe0, 0x53, 0x00 }},
+    { TSK_HOME,         2, { 0xe0, 0x47, 0x00 }},
+    { TSK_END,          2, { 0xe0, 0x4f, 0x00 }},
+    { TSK_PAGEUP,       2, { 0xe0, 0x49, 0x00 }},
+    { TSK_PAGEDOWN,     2, { 0xe0, 0x51, 0x00 }},
+    
+    { TSK_F1,           2, { 0x00, 0x3b, 0x00}},
+    { TSK_F2,           2, { 0x00, 0x3c, 0x00}},
+    { TSK_F3,           2, { 0x00, 0x3d, 0x00}},
+    { TSK_F4,           2, { 0x00, 0x3e, 0x00}},
+    { TSK_F5,           2, { 0x00, 0x3f, 0x00}},
+    { TSK_F6,           2, { 0x00, 0x40, 0x00}},
+    { TSK_F7,           2, { 0x00, 0x41, 0x00}},
+    { TSK_F8,           2, { 0x00, 0x42, 0x00}},
+    { TSK_F9,           2, { 0x00, 0x43, 0x00}},
+    { TSK_F10,          2, { 0x00, 0x44, 0x00}},
+    { TSK_F11,          2, { 0xe0, 0x85, 0x00}},
+    { TSK_F12,          2, { 0xe0, 0x86, 0x00}},
+    
+    { TSK_ARROW_LEFT   | TSK_CTRL,    2, { 0xe0, 0x73, 0x00 }},
+    { TSK_ARROW_RIGHT  | TSK_CTRL,    2, { 0xe0, 0x74, 0x00 }},
+    { TSK_ARROW_UP     | TSK_CTRL,    2, { 0xe0, 0x8d, 0x00 }},
+    { TSK_ARROW_DOWN   | TSK_CTRL,    2, { 0xe0, 0x91, 0x00 }},
+    { TSK_ARROW_LEFT   | TSK_ALT,     2, { 0x00, 0x9b, 0x00 }},
+    { TSK_ARROW_RIGHT  | TSK_ALT,     2, { 0x00, 0x9d, 0x00 }},
+    { TSK_ARROW_UP     | TSK_ALT,     2, { 0x00, 0x98, 0x00 }},
+    { TSK_ARROW_DOWN   | TSK_ALT,     2, { 0x00, 0xa0, 0x00 }},
+    
+    { TSK_INSERT       | TSK_CTRL,    2, { 0xe0, 0x92, 0x00 }},
+    { TSK_DELETE       | TSK_CTRL,    2, { 0xe0, 0x93, 0x00 }},
+    { TSK_HOME         | TSK_CTRL,    2, { 0xe0, 0x77, 0x00 }},
+    { TSK_END          | TSK_CTRL,    2, { 0xe0, 0x75, 0x00 }},
+    { TSK_PAGEUP       | TSK_CTRL,    2, { 0xe0, 0x86, 0x00 }},
+    { TSK_PAGEDOWN     | TSK_CTRL,    2, { 0xe0, 0x76, 0x00 }},
+    { TSK_INSERT       | TSK_ALT,     2, { 0x00, 0xa2, 0x00 }},
+    { TSK_DELETE       | TSK_ALT,     2, { 0x00, 0xa3, 0x00 }},
+    { TSK_HOME         | TSK_ALT,     2, { 0x00, 0x97, 0x00 }},
+    { TSK_END          | TSK_ALT,     2, { 0x00, 0x9f, 0x00 }},
+    { TSK_PAGEUP       | TSK_ALT,     2, { 0x00, 0x99, 0x00 }},
+    { TSK_PAGEDOWN     | TSK_ALT,     2, { 0x00, 0xa1, 0x00 }},
+    
+    { TSK_ENTER        | TSK_CTRL,    1, { 0x0a, 0x00, 0x00 }},
+    { TSK_BACKSPACE    | TSK_CTRL,    1, { 0x7f, 0x00, 0x00 }},
+    
+    // pad
+    { TSK_ARROW_LEFT,   2, { 0x00, 0x4b, 0x00 }},
+    { TSK_ARROW_RIGHT,  2, { 0x00, 0x4d, 0x00 }},
+    { TSK_ARROW_UP,     2, { 0x00, 0x48, 0x00 }},
+    { TSK_ARROW_DOWN,   2, { 0x00, 0x50, 0x00 }},
+    { TSK_HOME,         2, { 0x00, 0x47, 0x00 }},
+    { TSK_END,          2, { 0x00, 0x4f, 0x00 }},
+    { TSK_PAGEUP,       2, { 0x00, 0x49, 0x00 }},
+    { TSK_PAGEDOWN,     2, { 0x00, 0x51, 0x00 }},
+    { TSK_ARROW_LEFT   | TSK_CTRL,    2, { 0x00, 0x73, 0x00 }},
+    { TSK_ARROW_RIGHT  | TSK_CTRL,    2, { 0x00, 0x74, 0x00 }},
+    { TSK_ARROW_UP     | TSK_CTRL,    2, { 0x00, 0x8d, 0x00 }},
+    { TSK_ARROW_DOWN   | TSK_CTRL,    2, { 0x00, 0x91, 0x00 }},
+    { TSK_HOME         | TSK_CTRL,    2, { 0x00, 0x77, 0x00 }},
+    { TSK_END          | TSK_CTRL,    2, { 0x00, 0x75, 0x00 }},
+    { TSK_PAGEUP       | TSK_CTRL,    2, { 0x00, 0x86, 0x00 }},
+    { TSK_PAGEDOWN     | TSK_CTRL,    2, { 0x00, 0x76, 0x00 }},
+    
+    { TSK_F1           | TSK_SHIFT,   2, { 0x00, 0x54, 0x00}},
+    { TSK_F2           | TSK_SHIFT,   2, { 0x00, 0x55, 0x00}},
+    { TSK_F3           | TSK_SHIFT,   2, { 0x00, 0x56, 0x00}},
+    { TSK_F4           | TSK_SHIFT,   2, { 0x00, 0x57, 0x00}},
+    { TSK_F5           | TSK_SHIFT,   2, { 0x00, 0x58, 0x00}},
+    { TSK_F6           | TSK_SHIFT,   2, { 0x00, 0x59, 0x00}},
+    { TSK_F7           | TSK_SHIFT,   2, { 0x00, 0x5a, 0x00}},
+    { TSK_F8           | TSK_SHIFT,   2, { 0x00, 0x5b, 0x00}},
+    { TSK_F9           | TSK_SHIFT,   2, { 0x00, 0x5c, 0x00}},
+    { TSK_F10          | TSK_SHIFT,   2, { 0x00, 0x5d, 0x00}},
+    { TSK_F11          | TSK_SHIFT,   2, { 0xe0, 0x87, 0x00}},
+    { TSK_F12          | TSK_SHIFT,   2, { 0xe0, 0x88, 0x00}},
+    
+    { TSK_F1           | TSK_CTRL,    2, { 0x00, 0x5e, 0x00}},
+    { TSK_F2           | TSK_CTRL,    2, { 0x00, 0x5f, 0x00}},
+    { TSK_F3           | TSK_CTRL,    2, { 0x00, 0x60, 0x00}},
+    { TSK_F4           | TSK_CTRL,    2, { 0x00, 0x61, 0x00}},
+    { TSK_F5           | TSK_CTRL,    2, { 0x00, 0x62, 0x00}},
+    { TSK_F6           | TSK_CTRL,    2, { 0x00, 0x63, 0x00}},
+    { TSK_F7           | TSK_CTRL,    2, { 0x00, 0x64, 0x00}},
+    { TSK_F8           | TSK_CTRL,    2, { 0x00, 0x65, 0x00}},
+    { TSK_F9           | TSK_CTRL,    2, { 0x00, 0x66, 0x00}},
+    { TSK_F10          | TSK_CTRL,    2, { 0x00, 0x67, 0x00}},
+    { TSK_F11          | TSK_CTRL,    2, { 0xe0, 0x89, 0x00}},
+    { TSK_F12          | TSK_CTRL,    2, { 0xe0, 0x8a, 0x00}},
+    
+    { TSK_F1           | TSK_ALT,     2, { 0x00, 0x68, 0x00}},
+    { TSK_F2           | TSK_ALT,     2, { 0x00, 0x69, 0x00}},
+    { TSK_F3           | TSK_ALT,     2, { 0x00, 0x6a, 0x00}},
+    { TSK_F4           | TSK_ALT,     2, { 0x00, 0x6b, 0x00}},
+    { TSK_F5           | TSK_ALT,     2, { 0x00, 0x6c, 0x00}},
+    { TSK_F6           | TSK_ALT,     2, { 0x00, 0x6d, 0x00}},
+    { TSK_F7           | TSK_ALT,     2, { 0x00, 0x6e, 0x00}},
+    { TSK_F8           | TSK_ALT,     2, { 0x00, 0x6f, 0x00}},
+    { TSK_F9           | TSK_ALT,     2, { 0x00, 0x70, 0x00}},
+    { TSK_F10          | TSK_ALT,     2, { 0x00, 0x71, 0x00}},
+    { TSK_F11          | TSK_ALT,     2, { 0xe0, 0x8b, 0x00}},
+    { TSK_F12          | TSK_ALT,     2, { 0xe0, 0x8c, 0x00}},
+    
+    { 0,                0, { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }},
+};
 #else
 static struct KeySequence gKeyEscSequence [] = {  // (ubuntu default)
     { TSK_ARROW_LEFT,   3, { 0x1b, 0x5b, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00 }},
@@ -173,13 +282,40 @@ int TextScreen_RestoreTerm(void)
     }
     return ret;
 }
-static void TextScreen_SIGINT_handler(int sig)
-{
-    TextScreen_RestoreTerm();
-    exit(sig);
-}
 #endif
 
+// Windows prototype: BOOL HandlerRoutine(DWORD dwCtrlType)
+int TextScreen_SIGINT_handler(int sig)
+{
+    int ret = 0;
+    
+#ifdef _WIN32
+    // Windows sig value:
+    // CTRL_C_EVENT 0 : CTRL_BREAK_EVENT 1 : CTRL_CLOSE_EVENT 2
+    // CTRL_LOGOFF_EVENT 5 : CTRL_SHUTDOWN_EVENT 6
+    sig = 2;   // set sig value to same as linux SIGINT
+#endif
+    if (gSetting.sigintHandler) {
+        gSetting.sigintHandler(sig, gSetting.sigintHandlerUserData);
+        ret = 1;
+    } else {
+        // sigintHnadler is not defined...
+        TextScreen_End();
+#ifdef _WIN32
+        // Windows: use default ctrl handler (return=0)
+#else
+        // Lunux: force exit
+        exit(sig);
+#endif
+    }
+    return ret;
+}
+
+void TextScreen_SetSigintHandler(void (*handler)(int, void*), void *userdata)
+{
+    gSetting.sigintHandler = handler;
+    gSetting.sigintHandlerUserData = userdata;
+}
 
 int TextScreen_Init(TextScreenSetting *usersetting)
 {
@@ -188,15 +324,13 @@ int TextScreen_Init(TextScreenSetting *usersetting)
     if (!usersetting) {
         TextScreen_GetSettingDefault(&gSetting);
     } else {
-        gSetting = *usersetting;
-        if (gSetting.sar < 0.1)
-            gSetting.sar = 0.1;
-        if (gSetting.sar > 10.0)
-            gSetting.sar = 10.0;
+        TextScreen_SetSetting(usersetting);
     }
 #ifdef _WIN32
+    ret = !SetConsoleCtrlHandler((PHANDLER_ROUTINE)TextScreen_SIGINT_handler, TRUE);
 #else
-    signal(SIGINT, &TextScreen_SIGINT_handler);
+    if (signal(SIGINT, (void *)&TextScreen_SIGINT_handler) == SIG_ERR)
+        return -1;
     ret = TextScreen_SetNonBufferedTerm();
 #endif
     return ret;
@@ -209,6 +343,7 @@ int TextScreen_End(void)
 #else
     ret = TextScreen_RestoreTerm();
 #endif
+    TextScreen_SetCursorVisible(1);
     return ret;
 }
 
@@ -236,11 +371,33 @@ int TextScreen_ClearScreen(void)
     coord.Y = 0;
     SetConsoleCursorPosition(stdh ,coord);
 #else
+    fflush(stdout);
     printf("\x1b""c");
 //  printf("\x1b[2J");
     printf("\x1b[1;1H");
     fflush(stdout);
 #endif
+    return 0;
+}
+
+int TextScreen_ResizeScreen(int width, int height)
+{
+    if ((width < 0) || (height < 0)) return -1;
+    
+    if (!width || !height) {
+        int w, h;
+        TextScreen_GetConsoleSize(&w, &h);
+        if (!width) {
+            width = w - (SCREEN_DEFAULT_LEFT_MARGIN * 2);
+            if (width < 1) return -1;
+        }
+        if (!height) {
+            height = h - (SCREEN_DEFAULT_TOP_MARGIN * 2);
+            if (height < 1) return -1;
+        }
+    }
+    gSetting.width  = width;
+    gSetting.height = height;
     return 0;
 }
 
@@ -306,8 +463,8 @@ int TextScreen_SetCursorPos(int x, int y)
     if (y < 0) y = 0;
     if (y >= height) y = height - 1;
     
-    coord.X = x;
-    coord.Y = y;
+    coord.X = (SHORT)x;
+    coord.Y = (SHORT)y;
     SetConsoleCursorPosition(stdouth ,coord);
 #else
     char strbuf[32];
@@ -316,6 +473,7 @@ int TextScreen_SetCursorPos(int x, int y)
     if (y < 0) y = 0;
     if (x > 32767) x = 32767;
     if (y > 32767) y = 32767;
+    fflush(stdout);
     snprintf(strbuf, sizeof(strbuf), "\x1b[%d;%dH", y+1, x+1);
     printf("%s", strbuf);   // set cursor position "\x1b[yy;xxH"
     fflush(stdout);
@@ -337,6 +495,7 @@ int TextScreen_SetCursorVisible(int visible)
     SetConsoleCursorInfo(stdouth, &cursorinfo);
     return 0;
 #else
+    fflush(stdout);
     if (visible) {
         printf("\x1b[?25h");  // show cursor
     } else {
@@ -389,6 +548,19 @@ void TextScreen_GetSetting(TextScreenSetting *setting)
     *setting = gSetting;
 }
 
+int TextScreen_SetSetting(TextScreenSetting *setting)
+{
+    if (!setting) return -1;
+    
+    gSetting = *setting;
+    if (gSetting.sar < 0.1)
+        gSetting.sar = 0.1;
+    if (gSetting.sar > 10.0)
+        gSetting.sar = 10.0;
+    
+    return 0;
+}
+
 void TextScreen_GetSettingDefault(TextScreenSetting *setting)
 {
     int width, height;
@@ -404,20 +576,49 @@ void TextScreen_GetSettingDefault(TextScreenSetting *setting)
     setting->leftMargin = SCREEN_DEFAULT_LEFT_MARGIN;
     setting->sar        = SCREEN_DEFAULT_SAR;
     setting->renderingMethod = SCREEN_DEFAULT_RENDERING_METHOD;
+    setting->sigintHandler = NULL;
+    setting->sigintHandlerUserData = NULL;
     setting->translate  = (char *)gTranslateTable;
 }
 
+// #TODO: refactoring code of TextScreen_GetKey()
 int TextScreen_GetKey(void) {
     int key = 0;
-    unsigned char ch = 0;
+    int ch = 0;
     
 #ifdef _WIN32
     if (_kbhit()) {
+        int j;
+        unsigned char seq[8] = {0}
+        ;
         ch = _getch();
-        key = ch;
-        if (ch == 0xe0) {
+        seq[0] = (unsigned char)ch;
+        if (ch == 0xe0 || ch == 0x00) {
             ch = _getch();
+            seq[1] = (unsigned char)ch;
+            j = 0;
+            while (gKeyScanWin[j].keycode) {
+                if (gKeyScanWin[j].num == 2) {
+                    if ((gKeyScanWin[j].seq[0] == seq[0]) && (gKeyScanWin[j].seq[1] == seq[1])) {
+                        key = gKeyScanWin[j].keycode;
+                        return key;
+                    }
+                }
+                j++;
+            }
             key = TSK_POSKEY + ch;
+        } else {
+            j = 0;
+            while (gKeyScanWin[j].keycode) {
+                if (gKeyScanWin[j].num == 1) {
+                    if (gKeyScanWin[j].seq[0] == seq[0]) {
+                        key = gKeyScanWin[j].keycode;
+                        return key;
+                    }
+                }
+                j++;
+            }
+            key = seq[0];
         }
     }
 #else
@@ -992,6 +1193,7 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
         }
     }
 #else
+    fflush(stdout);
     // printf("\x1b[?25l");    // hide cursor
     printf("\x1b[1;1H");   // set cursor position to 1,1 (top-left corner)
     fflush(stdout);
