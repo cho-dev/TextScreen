@@ -1,9 +1,8 @@
 /**********************************************************
  conway's game of life
      programming by Coffey   20151030
-               last modified 20160406
+               last modified 20160409
      for Windows, Linux(ubuntu)
-
  require:
  textscree.c, textscreen.h (version >= 20160406)
  
@@ -27,7 +26,7 @@
 #define BOARD_SIZE_WIDTH   500
 #define BOARD_SIZE_HEIGHT  500
 // version string
-#define VERSION_STR        "1.41"
+#define VERSION_STR        "1.42"
 
 #define BOARD_SPACE_CHAR  '.'
 #define BOARD_ALIVE_CHAR  '#'
@@ -754,6 +753,114 @@ void SetBoardSize(LifeParam *lp)
 // -------------------------------------------------------------
 void LoadPreset(LifeParam *lp)
 {
+    // Preset Patterns ("title", "1st line", "2nd line", ... "")
+    char *preset_pattern[] = {
+        // F(R) pentomino
+        "F(R) pentomino",
+        ".##",
+        "##",
+        ".#",
+        "",
+        // Glider
+        "Glider",
+        ".#",
+        "..#",
+        "###",
+        "",
+        // Spaceship
+        "Spaceship (lightweight, middleweight, heavyweight)",
+        ".........................#..#",
+        ".............................#",
+        "...............#.........#...#",
+        ".............#...#........####",
+        "..................#",
+        ".............#....#",
+        "..##..........#####......#..#",
+        "#....#.......................#",
+        "......#..................#...#",
+        "#.....#........#..........####",
+        ".######......#...#",
+        "..................#",
+        ".............#....#......#..#",
+        "..............#####..........#",
+        ".........................#...#",
+        "..........................####",
+        "",
+        // Spaceship Crash
+        "Spaceship Crash",
+        "..#.........................................#",
+        "#...#.....................................#...#",
+        ".....#...................................#",
+        "#....#...................................#....#",
+        ".#####...................................#####",
+        ".",
+        ".",
+        ".",
+        ".......#..#.........................#..#",
+        "...........#.......................#",
+        ".......#...#.......................#...#",
+        "........####.......................####",
+        "",
+        // Diehard
+        "Diehard",
+        "......#",
+        "##",
+        ".#...###",
+        "",
+        // Acom
+        "Acom",
+        ".#",
+        "...#",
+        "##..###",
+        "",
+        // Gosper Glider Gun
+        "Gosper Glider Gun",
+        "........................#",
+        "......................#.#",
+        "............##......##",
+        "...........#...#....##............##",
+        "..........#.....#...##............##",
+        "##........#...#.##....#.#",
+        "##........#.....#.......#",
+        "...........#...#",
+        "............##",
+        "",
+        // Pulsar
+        "Pulsar",
+        "..###...###",
+        ".",
+        "#....#.#....#",
+        "#....#.#....#",
+        "#....#.#....#",
+        "..###...###",
+        ".",
+        "..###...###",
+        "#....#.#....#",
+        "#....#.#....#",
+        "#....#.#....#",
+        ".",
+        "..###...###",
+        "",
+        // Kok's Galaxy
+        "Kok's Galaxy",
+        "######.##",
+        "######.##",
+        ".......##",
+        "##.....##",
+        "##.....##",
+        "##.....##",
+        "##",
+        "##.######",
+        "##.######",
+        "",
+        // Pentadecathlon
+        "Pentadecathlon",
+        "..#....#",
+        "##.####.##",
+        "..#....#",
+        "",
+        // data termination string
+        "" };
     int quit;
     int cury;
     int curoffsetx, curoffsety;
@@ -761,20 +868,26 @@ void LoadPreset(LifeParam *lp)
     
     TextScreen_ClearScreen();
     TextScreen_SetCursorVisible(1);
-    
-    max = 10;
     TextScreen_SetCursorPos(0,2);
     printf("  Load preset pattern.\n\n");
-    printf("     1: F(R) pentomino\n");
-    printf("     2: Glider\n");
-    printf("     3: Spaceship (lightweight, middleweight, heavyweight)\n");
-    printf("     4: Spaceship Crash\n");
-    printf("     5: Diehard\n");
-    printf("     6: Acom\n");
-    printf("     7: Gosper Glider Gun\n");
-    printf("     8: Pulsar\n");
-    printf("     9: Kok's Galaxy\n");
-    printf("    10: Pentadecathlon\n");
+    {  // print pattern name.
+        int str_n = 0, pattern_n = 1, title = 1;
+        
+        TextScreen_ClearBitmap(lp->bitmap);
+        while (*preset_pattern[str_n]) {
+            while (*preset_pattern[str_n]) {
+                if (title) {
+                    printf ("    %2d: %s\n", pattern_n, preset_pattern[str_n]);
+                    title = 0;
+                }
+                str_n++;
+            }
+            title = 1;
+            pattern_n++;
+            str_n++;
+        }
+        max = pattern_n - 1;
+    }
     printf("\n");
     printf("\n");
     printf("  [arrow Up/Down]select  [Enter][p]load  [Esc]exit without load\n");
@@ -804,7 +917,7 @@ void LoadPreset(LifeParam *lp)
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     printf(" ");
                     cury--;
-                    if (cury < 1) cury = 1;
+                    if (cury < 1) cury = max;
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     printf("@");
                     break;
@@ -812,7 +925,7 @@ void LoadPreset(LifeParam *lp)
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     printf(" ");
                     cury++;
-                    if (cury > max) cury = max;
+                    if (cury > max) cury = 1;
                     TextScreen_SetCursorPos(curoffsetx, curoffsety + cury);
                     printf("@");
                     break;
@@ -821,128 +934,49 @@ void LoadPreset(LifeParam *lp)
         }
         TextScreen_Wait(10);
     }
-    if (cury) {
-        int y = 0;
+    if (cury) {  // selected
+        int str_n = 0, pattern_n = 1, p = 0, title = 1;
+        TextScreenBitmap *tempbitmap;
+        int x, y;
+        
         TextScreen_ClearBitmap(lp->bitmap);
-        switch (cury) {
-            case 1:  // F(R) pentomino
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".#");
+        
+        // load pattern
+        while (*preset_pattern[str_n]) {
+            while (*preset_pattern[str_n]) {
+                if ((cury == pattern_n) && (!title)) {
+                    TextScreen_DrawText(lp->bitmap, 0, p++, preset_pattern[str_n]);
+                } else {
+                    title = 0;
+                }
+                str_n++;
+            }
+            pattern_n++;
+            if (pattern_n > cury)
                 break;
-            case 2:  // Glider
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "###");
-                break;
-            case 3: // Spaceship
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".........................#..#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".............................#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "...............#.........#...#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".............#...#........####");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..................#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".............#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..##..........#####......#..#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.......................#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "......#..................#...#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#.....#........#..........####");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".######......#...#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..................#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".............#....#......#..#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..............#####..........#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".........................#...#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..........................####");
-                break;
-            case 4:  // Spaceship Crash
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..#.........................................#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#...#.....................................#...#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".....#...................................#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#...................................#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".#####...................................#####");
-                // TextScreen_DrawText(lp->bitmap, 0, y++, "");
-                // TextScreen_DrawText(lp->bitmap, 0, y++, "");
-                // TextScreen_DrawText(lp->bitmap, 0, y++, "");
-                // TextScreen_DrawText(lp->bitmap, 0, y++, ".......#..#.........................#..#");
-                // TextScreen_DrawText(lp->bitmap, 0, y++, "...........#.......................#");
-                // TextScreen_DrawText(lp->bitmap, 0, y++, ".......#...#.......................#...#");
-                // TextScreen_DrawText(lp->bitmap, 0, y++, "........####.......................####");
-                break;
-            case 5:  // Diehard
-                TextScreen_DrawText(lp->bitmap, 0, y++, "......#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".#...###");
-                break;
-            case 6:  // Acom
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "...#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##..###");
-                break;
-            case 7:  // Gosper Glider Gun
-                TextScreen_DrawText(lp->bitmap, 0, y++, "........................#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "......................#.#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "............##......##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "...........#...#....##............##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..........#.....#...##............##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##........#...#.##....#.#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##........#.....#.......#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "...........#...#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "............##");
-                 break;
-            case 8:  // Pulsar
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..###...###");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..###...###");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..###...###");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "#....#.#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..###...###");
-                break;
-            case 9:  // Kok's Galaxy
-                TextScreen_DrawText(lp->bitmap, 0, y++, "######.##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "######.##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, ".......##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##.....##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##.....##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##.....##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##.######");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##.######");
-                break;
-            case 10:  // Pentadecathlon
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..#....#");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "##.####.##");
-                TextScreen_DrawText(lp->bitmap, 0, y++, "..#....#");
-                break;
-            default:
-                break;
+            title = 1;
+            str_n++;
         }
-        {
-            TextScreenBitmap *tempbitmap;
-            int x, y;
-            
-            for (y = 0; y < lp->bitmap->height; y++) {
-                for (x = 0; x < lp->bitmap->width; x++) {
-                    if (TextScreen_GetCell(lp->bitmap, x, y) == '#') {
-                        TextScreen_PutCell(lp->bitmap, x, y, lp->aliveChar);
-                    } else {
-                        TextScreen_ClearCell(lp->bitmap, x, y);
-                    }
+        
+        // convert to internal format
+        for (y = 0; y < lp->bitmap->height; y++) {
+            for (x = 0; x < lp->bitmap->width; x++) {
+                if (TextScreen_GetCell(lp->bitmap, x, y) == '#') {
+                    TextScreen_PutCell(lp->bitmap, x, y, lp->aliveChar);
+                } else {
+                    TextScreen_ClearCell(lp->bitmap, x, y);
                 }
             }
-            CheckActive(lp);
-            tempbitmap = TextScreen_DupBitmap(lp->bitmap);
-            TextScreen_ClearBitmap(lp->bitmap);
-            TextScreen_CopyBitmap(lp->bitmap, tempbitmap,
-                    (lp->bitmap->width - (lp->active.right - lp->active.left)) / 2 - lp->active.left,
-                    (lp->bitmap->height - (lp->active.bottom - lp->active.top)) / 2 - lp->active.top);
-            TextScreen_FreeBitmap(tempbitmap);
         }
+        
+        // move loaded pattern to center of bitmap
+        CheckActive(lp);
+        tempbitmap = TextScreen_DupBitmap(lp->bitmap);
+        TextScreen_ClearBitmap(lp->bitmap);
+        TextScreen_CopyBitmap(lp->bitmap, tempbitmap,
+                (lp->bitmap->width - (lp->active.right - lp->active.left)) / 2 - lp->active.left,
+                (lp->bitmap->height - (lp->active.bottom - lp->active.top)) / 2 - lp->active.top);
+        TextScreen_FreeBitmap(tempbitmap);
     }
     TextScreen_SetCursorVisible(0);
 }
@@ -995,12 +1029,15 @@ void EditBoard(LifeParam *lp)
     char *helptext = "  [space]toggle [Enter]start [x]clear [r]read [s]store [h]help         ";
 #endif
 
+#define EDITBOARD_CURSORCENTER() {  \
+    curx = (lp->setting.width  + 1) / 2 + lp->setting.leftMargin;  \
+    cury = (lp->setting.height + 1) / 2 + lp->setting.topMargin;   \
+}
 #define EDITBOARD_SHOWCENTER() {  \
     lp->offsetx = (lp->bitmap->width - lp->setting.width) / 2;     \
     lp->offsety = (lp->bitmap->height - lp->setting.height) / 2;   \
-    curx = lp->setting.width / 2 + lp->setting.leftMargin;         \
-    cury = lp->setting.height / 2 + lp->setting.topMargin;         \
     TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety); \
+    EDITBOARD_CURSORCENTER();                                      \
 }
 #define  EDITBOARD_SHOWHELPLINE() {  \
     TextScreen_SetCursorPos(0, lp->setting.height + lp->setting.topMargin);  \
@@ -1010,8 +1047,7 @@ void EditBoard(LifeParam *lp)
 
     TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
     EDITBOARD_SHOWHELPLINE();
-    curx = lp->setting.width / 2 + lp->setting.leftMargin;
-    cury = lp->setting.height / 2 + lp->setting.topMargin;
+    EDITBOARD_CURSORCENTER()
     TextScreen_SetCursorPos(curx, cury);
     TextScreen_SetCursorVisible(1);
     
@@ -1137,11 +1173,8 @@ void EditBoard(LifeParam *lp)
             TextScreen_SetCursorPos(curx, cury);
         }
         if (ResizeConsole(lp)) {
-            TextScreen_ClearScreen();
-            TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
             EDITBOARD_SHOWHELPLINE();
-            curx = lp->setting.width / 2 + lp->setting.leftMargin;
-            cury = lp->setting.height / 2 + lp->setting.topMargin;
+            EDITBOARD_CURSORCENTER()
             TextScreen_SetCursorPos(curx, cury);
         }
         TextScreen_Wait(10);
