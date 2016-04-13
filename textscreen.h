@@ -14,7 +14,7 @@
 #ifndef TEXTSCREEN_TEXTSCREEN_H
 #define TEXTSCREEN_TEXTSCREEN_H
 
-#define TEXTSCREEN_TEXTSCREEN_VERSION 20160406
+#define TEXTSCREEN_TEXTSCREEN_VERSION 20160413
 
 // max bitmap width and height
 #define TEXTSCREEN_MAXSIZE 32768
@@ -62,9 +62,9 @@
 
 // rendering method (output method)
 enum TextScreenRenderingMethod {
-    TEXTSCREEN_RENDERING_METHOD_FAST,        // fast speed
+    TEXTSCREEN_RENDERING_METHOD_FAST = 0,    // fast speed
     TEXTSCREEN_RENDERING_METHOD_NORMAL,      // normal speed. good quality
-    TEXTSCREEN_RENDERING_METHOD_SLOW,        // output character 1 by 1 (use fputc)
+    TEXTSCREEN_RENDERING_METHOD_SLOW,        // output character 1 by 1 (use fputc) and sleep(0) by line
     TEXTSCREEN_RENDERING_METHOD_WINCONSOLE,  // use Windows console api (very fast, use WriteConsole())
     TEXTSCREEN_RENDERING_METHOD_NB           // number of method
 };
@@ -135,6 +135,9 @@ unsigned int TextScreen_GetTickCount(void);
 
 // set space character to ch
 void TextScreen_SetSpaceChar(char ch);
+
+// set rendering method
+void TextScreen_SetRenderingMethod(int method);
 
 // get copy of current settings
 void TextScreen_GetSetting(TextScreenSetting *setting);

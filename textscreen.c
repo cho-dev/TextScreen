@@ -4,7 +4,7 @@
  TextScreen library. (C version)
      by Coffey (c)2015-2016
      
-     VERSION 20160406
+     VERSION 20160413
      
      Windows     : Win2K or later
      Non Windows : console support ANSI escape sequence
@@ -16,6 +16,7 @@
 *********************************/
 
 // get more correct time in TextScreen_GetTickCount() for windows
+// use timeGetTime()  (winmm.lib)
 #define USE_WINMM 0
 
 #ifdef _WIN32
@@ -62,7 +63,27 @@
 #define SCREEN_DEFAULT_RENDERING_METHOD   TEXTSCREEN_RENDERING_METHOD_FAST
 #endif
 
-// key sequence table for Linux
+// ANSI escape code for terminal
+#define P_CURSOR_UP()       {printf("\x1b[1A");fflush(stdout);}
+#define P_CURSOR_DOWN()     {printf("\x1b[1B");fflush(stdout);}
+#define P_CURSOR_FORWARD()  {printf("\x1b[1C");fflush(stdout);}
+#define P_CURSOR_BACK()     {printf("\x1b[1D");fflush(stdout);}
+#define P_ERASE_BELOW()     {printf("\x1b[0J");fflush(stdout);}
+#define P_ERASE_ABOVE()     {printf("\x1b[1J");fflush(stdout);}
+#define P_ERASE_ALL()       {printf("\x1b[2J");fflush(stdout);}
+#define P_CLS()             {printf("\x1b[2J");fflush(stdout);}
+#define P_RESET_STATE()     {printf("\x1b""c");fflush(stdout);}
+#define P_CURSOR_POS(x,y)  {                                    \
+    char strbuf[32];                                            \
+    snprintf(strbuf, sizeof(strbuf), "\x1b[%d;%dH", y+1, x+1);  \
+    printf("%s", strbuf);                                       \
+    fflush(stdout);                                             \
+}
+#define P_CURSOR_SHOW()      {printf("\x1b[?25h");fflush(stdout);}
+#define P_CURSOR_HIDE()      {printf("\x1b[?25l");fflush(stdout);}
+#define P_SGR_RESET()        {printf("\x1b[0m");fflush(stdout);}
+
+// key sequence table
 struct KeySequence {
     int keycode;
     int num;
@@ -256,20 +277,19 @@ int TextScreen_SetNonBufferedTerm(void)
     int ret = 0;
     
     if (gSavedTermFlag) {
-        ret = tcsetattr(0, TCSANOW, &gSavedTerm);
+        ret = tcsetattr(STDIN_FILENO, TCSANOW, &gSavedTerm);
         gSavedTermFlag = 0;
     }
-    ret = tcgetattr(0, &term);
+    ret = tcgetattr(STDIN_FILENO, &term);
     if (ret < 0) return ret;
     gSavedTerm = term;
     gSavedTermFlag = 1;
     term.c_lflag &= ~(ECHO | ICANON);
     term.c_cc[VMIN]  = 1;
     term.c_cc[VTIME] = 0;
-    ret = tcsetattr(0, TCSANOW, &term);
+    ret = tcsetattr(STDIN_FILENO, TCSANOW, &term);
     if (ret < 0) return ret;
-    ret = fcntl(0, F_SETFL, O_NONBLOCK);
-    if (ret < 0) return ret;
+    // note: set non-blocking mode at TextScreen_GetKey()
     
     return ret;
 }
@@ -371,11 +391,9 @@ int TextScreen_ClearScreen(void)
     coord.Y = 0;
     SetConsoleCursorPosition(stdh ,coord);
 #else
-    fflush(stdout);
-    printf("\x1b""c");
-//  printf("\x1b[2J");
-    printf("\x1b[1;1H");
-    fflush(stdout);
+    // P_RESET_STATE();
+    P_ERASE_ALL();
+    P_CURSOR_POS(0, 0);
 #endif
     return 0;
 }
@@ -467,16 +485,12 @@ int TextScreen_SetCursorPos(int x, int y)
     coord.Y = (SHORT)y;
     SetConsoleCursorPosition(stdouth ,coord);
 #else
-    char strbuf[32];
-    
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     if (x > 32767) x = 32767;
     if (y > 32767) y = 32767;
-    fflush(stdout);
-    snprintf(strbuf, sizeof(strbuf), "\x1b[%d;%dH", y+1, x+1);
-    printf("%s", strbuf);   // set cursor position "\x1b[yy;xxH"
-    fflush(stdout);
+    
+    P_CURSOR_POS(x, y);
 #endif
     return 0;
 }
@@ -495,13 +509,11 @@ int TextScreen_SetCursorVisible(int visible)
     SetConsoleCursorInfo(stdouth, &cursorinfo);
     return 0;
 #else
-    fflush(stdout);
     if (visible) {
-        printf("\x1b[?25h");  // show cursor
+        P_CURSOR_SHOW();
     } else {
-        printf("\x1b[?25l");  // hide cursor
+        P_CURSOR_HIDE();
     }
-    fflush(stdout);
     return 0;
 #endif
 }
@@ -543,6 +555,13 @@ void TextScreen_SetSpaceChar(char ch)
     gSetting.space = ch;
 }
 
+void TextScreen_SetRenderingMethod(int method)
+{
+    if ((method >= 0) && (method < TEXTSCREEN_RENDERING_METHOD_NB)) {
+        gSetting.renderingMethod = method;
+    }
+}
+
 void TextScreen_GetSetting(TextScreenSetting *setting)
 {
     *setting = gSetting;
@@ -581,12 +600,12 @@ void TextScreen_GetSettingDefault(TextScreenSetting *setting)
     setting->translate  = (char *)gTranslateTable;
 }
 
-// #TODO: refactoring code of TextScreen_GetKey()
+// #TODO: refactoring and improving code of TextScreen_GetKey()
 int TextScreen_GetKey(void) {
+#ifdef _WIN32
     int key = 0;
     int ch = 0;
     
-#ifdef _WIN32
     if (_kbhit()) {
         int j;
         unsigned char seq[8] = {0}
@@ -621,10 +640,21 @@ int TextScreen_GetKey(void) {
             key = seq[0];
         }
     }
+    return key;
 #else
-    int nkey;
+    int key = 0;
+    int ch = 0;
     
-    nkey = read(0, &ch, 1);
+    int nkey;
+    int savefflag = 0;
+    int ret;
+    
+    // set non-blocking mode
+    savefflag = fcntl(STDIN_FILENO, F_GETFL);
+    ret = fcntl(STDIN_FILENO, F_SETFL, savefflag | O_NONBLOCK);
+    if (ret < 0) return 0;
+    
+    nkey = read(STDIN_FILENO, &ch, 1);
     if (nkey == 1) {
         key = ch;
         if (ch == 0x0a) {
@@ -636,11 +666,13 @@ int TextScreen_GetKey(void) {
             
             seq[0] = ch;
             for (i = 2; i < 7; i++) {
-                nkey = read(0, &ch, 1);
+                nkey = read(STDIN_FILENO, &ch, 1);
                 if (nkey != 1) {
                     if (i == 2) {
+                        fcntl(STDIN_FILENO, F_SETFL, savefflag);
                         return TSK_ESC;
                     } else {
+                        fcntl(STDIN_FILENO, F_SETFL, savefflag);
                         return 0;
                     }
                 }
@@ -650,21 +682,24 @@ int TextScreen_GetKey(void) {
                     if (gKeyEscSequence[j].num == i) {
                         if(!strcmp((char *)seq, (char *)gKeyEscSequence[j].seq)) {
                             key = gKeyEscSequence[j].keycode;
-                            while (read(0, &ch, 1) == 1);
+                            while (read(STDIN_FILENO, &ch, 1) == 1);
+                            fcntl(STDIN_FILENO, F_SETFL, savefflag);
                             return key;
                         }
                     }
                     j++;
                 }
             }
-            while (read(0, &ch, 1) == 1);
+            while (read(STDIN_FILENO, &ch, 1) == 1);
             key = 0;
         }
     } else {
         key = 0;
     }
-#endif
+    // restore file mode
+    fcntl(STDIN_FILENO, F_SETFL, savefflag);
     return key;
+#endif
 }
 
 
@@ -1193,13 +1228,10 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
         }
     }
 #else
-    fflush(stdout);
-    // printf("\x1b[?25l");    // hide cursor
-    printf("\x1b[1;1H");   // set cursor position to 1,1 (top-left corner)
-    fflush(stdout);
+    P_CURSOR_POS(0, 0);
 #endif
     
-    // those 'change sign' is historical reason.
+    // these 'change sign' is historical reason.
     dx = -dx;
     dy = -dy;
     
@@ -1237,6 +1269,7 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
                 fputc(gSetting.translate[(unsigned char)ch], stdout);
             }
             printf("\n");
+            TextScreen_Wait(0);
         }
     }
     
@@ -1296,11 +1329,6 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
         }
 #endif
     }
-    
-#ifdef _WIN32
-#else
-    // printf("\x1b[?25h");  // show cursor
-#endif
     
     fflush(stdout);
     if (buf) free(buf);

@@ -1,7 +1,7 @@
 /**********************************************************
  conway's game of life
      programming by Coffey   20151030
-               last modified 20160409
+               last modified 20160413
      for Windows, Linux(ubuntu)
  require:
  textscree.c, textscreen.h (version >= 20160406)
@@ -26,7 +26,7 @@
 #define BOARD_SIZE_WIDTH   500
 #define BOARD_SIZE_HEIGHT  500
 // version string
-#define VERSION_STR        "1.42"
+#define VERSION_STR        "1.44"
 
 #define BOARD_SPACE_CHAR  '.'
 #define BOARD_ALIVE_CHAR  '#'
@@ -873,7 +873,6 @@ void LoadPreset(LifeParam *lp)
     {  // print pattern name.
         int str_n = 0, pattern_n = 1, title = 1;
         
-        TextScreen_ClearBitmap(lp->bitmap);
         while (*preset_pattern[str_n]) {
             while (*preset_pattern[str_n]) {
                 if (title) {
