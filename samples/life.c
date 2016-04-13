@@ -26,7 +26,7 @@
 #define BOARD_SIZE_WIDTH   500
 #define BOARD_SIZE_HEIGHT  500
 // version string
-#define VERSION_STR        "1.44"
+#define VERSION_STR        "1.45"
 
 #define BOARD_SPACE_CHAR  '.'
 #define BOARD_ALIVE_CHAR  '#'
@@ -1305,7 +1305,7 @@ int main(void)
     TextScreen_Init(NULL);
     TextScreen_SetSpaceChar(BOARD_SPACE_CHAR);
     TextScreen_GetSetting(&lp.setting);
-    // set interrupt hander (Ctrl+C)
+    // set interrupt handler (Ctrl+C)
     TextScreen_SetSigintHandler(SigintHandler, (void *)&lp);
     TextScreen_ClearScreen();
     TextScreen_SetCursorVisible(0);
@@ -1335,12 +1335,9 @@ int main(void)
         KeyboardCheck(&lp);
     }
     
-    // move cursor to end of line, and 2 scrolls
+    // move cursor to end of line, and line feed
     TextScreen_SetCursorPos(0, lp.consoleHeight - 1);
     printf("\n");
-    TextScreen_Wait(50);
-    printf("\n");
-    fflush(stdout);
     // free board
     FreeLifeParam(&lp);
     // free TextScreen
