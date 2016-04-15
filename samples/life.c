@@ -1,21 +1,21 @@
 /**********************************************************
  conway's game of life
      programming by Coffey   20151030
-               last modified 20160413
+               last modified 20160415
      for Windows, Linux(ubuntu)
  require:
  textscree.c, textscreen.h (version >= 20160406)
  
- build:
+ build:(-std=c99)
  gcc life.c textscreen.c -Wall -lm -o life.exe (Windows)
  gcc life.c textscreen.c -Wall -lm -o life.out (Linux)
+ Require 'xsel' command to use clipboard for Linux.
  **********************************************************/
-// use snprintf
-// #define _POSIX_C_SOURCE 200112L
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #ifdef _WIN32
 // include windows.h for Clipboard API
@@ -23,13 +23,15 @@
 #endif
 
 // default board size
-#define BOARD_SIZE_WIDTH   500
-#define BOARD_SIZE_HEIGHT  500
+#define BOARD_SIZE_WIDTH    500
+#define BOARD_SIZE_HEIGHT   500
+// max board size
+#define BOARD_SIZE_MAX      10000
 // version string
-#define VERSION_STR        "1.45"
+#define VERSION_STR         "1.50"
 
-#define BOARD_SPACE_CHAR  '.'
-#define BOARD_ALIVE_CHAR  '#'
+#define BOARD_SPACE_CHAR    '.'
+#define BOARD_SURVIVE_CHAR  '#'
 
 #include "textscreen.h"
 
@@ -58,13 +60,40 @@ typedef struct LifeParam {
     int  restartGenCount;
     int  pause;
     int  quit;
-    char aliveChar;
+    char surviveChar;
     Rect active;
     int  borderless;
-    int  rule_alive[9];
+    int  rule_survive[9];
     int  rule_born[9];
     char name[256];
+    char author[256];
+    char comment[512];
+    int  patternWidth;
+    int  patternHeight;
 } LifeParam;
+
+// -------------------------------------------------------------
+// fix for MS(msvcrt) snprintf
+// -------------------------------------------------------------
+int snprintf_a(char *buffer, size_t count, const char *format, ...)
+{
+    int ret;
+    va_list ap;
+    
+    va_start(ap, format);
+#ifdef _WIN32
+#ifdef _MSC_VER
+    ret = _vsnprintf_s(buffer, count, _TRUNCATE, format, ap);
+#else
+    ret = vsnprintf(buffer, count - 1, format, ap);
+    buffer[count - 1] = 0;
+#endif
+#else
+    ret = vsnprintf(buffer, count, format, ap);
+#endif
+    va_end(ap);
+    return ret;
+}
 
 // -------------------------------------------------------------
 // set default rules to LifeParam
@@ -72,15 +101,15 @@ typedef struct LifeParam {
 void SetDefaultRules(LifeParam *lp)
 {
     // set default rule (B3/S23)
-    lp->rule_alive[0] = 0;
-    lp->rule_alive[1] = 0;
-    lp->rule_alive[2] = 1;
-    lp->rule_alive[3] = 1;
-    lp->rule_alive[4] = 0;
-    lp->rule_alive[5] = 0;
-    lp->rule_alive[6] = 0;
-    lp->rule_alive[7] = 0;
-    lp->rule_alive[8] = 0;
+    lp->rule_survive[0] = 0;
+    lp->rule_survive[1] = 0;
+    lp->rule_survive[2] = 1;
+    lp->rule_survive[3] = 1;
+    lp->rule_survive[4] = 0;
+    lp->rule_survive[5] = 0;
+    lp->rule_survive[6] = 0;
+    lp->rule_survive[7] = 0;
+    lp->rule_survive[8] = 0;
     
     lp->rule_born[0] = 0;
     lp->rule_born[1] = 0;
@@ -91,6 +120,18 @@ void SetDefaultRules(LifeParam *lp)
     lp->rule_born[6] = 0;
     lp->rule_born[7] = 0;
     lp->rule_born[8] = 0;
+}
+
+// -------------------------------------------------------------
+// Clear pattern info
+// -------------------------------------------------------------
+void ClearPatternInfo(LifeParam *lp)
+{
+    lp->name[0] = 0;
+    lp->author[0] = 0;
+    lp->comment[0] = 0;
+    lp->patternWidth = 0;
+    lp->patternHeight = 0;
 }
 
 // -------------------------------------------------------------
@@ -107,7 +148,7 @@ void InitLifeParam(LifeParam *lp)
     TextScreen_GetConsoleSize(&(lp->consoleWidth), &(lp->consoleHeight));
     lp->offsetx = (width - lp->setting.width) / 2;
     lp->offsety = (height - lp->setting.height) / 2;
-    lp->aliveChar = BOARD_ALIVE_CHAR;
+    lp->surviveChar = BOARD_SURVIVE_CHAR;
     lp->genCount = 0;
     lp->restartGenCount = 0;
     lp->wait = 10;
@@ -118,17 +159,17 @@ void InitLifeParam(LifeParam *lp)
     lp->active.left = 0;
     lp->active.right = lp->bitmap->width - 1;
     lp->borderless = 0;
-    lp->name[0] = 0;
+    ClearPatternInfo(lp);
     
     // set default rule
     SetDefaultRules(lp);
     
     // initial pattern (F-pentomino)
-    TextScreen_PutCell(lp->bitmap, width / 2    , height / 2 - 1, lp->aliveChar);
-    TextScreen_PutCell(lp->bitmap, width / 2 + 1, height / 2 - 1, lp->aliveChar);
-    TextScreen_PutCell(lp->bitmap, width / 2 - 1, height / 2    , lp->aliveChar);
-    TextScreen_PutCell(lp->bitmap, width / 2    , height / 2    , lp->aliveChar);
-    TextScreen_PutCell(lp->bitmap, width / 2    , height / 2 + 1, lp->aliveChar);
+    TextScreen_PutCell(lp->bitmap, width / 2    , height / 2 - 1, lp->surviveChar);
+    TextScreen_PutCell(lp->bitmap, width / 2 + 1, height / 2 - 1, lp->surviveChar);
+    TextScreen_PutCell(lp->bitmap, width / 2 - 1, height / 2    , lp->surviveChar);
+    TextScreen_PutCell(lp->bitmap, width / 2    , height / 2    , lp->surviveChar);
+    TextScreen_PutCell(lp->bitmap, width / 2    , height / 2 + 1, lp->surviveChar);
 }
 
 // -------------------------------------------------------------
@@ -142,11 +183,13 @@ void FreeLifeParam(LifeParam *lp)
 }
 
 // -------------------------------------------------------------
-// detect alive region (rectangle).
+// detect active region (rectangle)
+// return number of survive cell
 // -------------------------------------------------------------
-void CheckActive(LifeParam *lp)
+int CheckActive(LifeParam *lp)
 {
     int x, y;
+    int count = 0;
     
     lp->active.top = lp->bitmap->height - 1;
     lp->active.bottom = 0;
@@ -154,16 +197,21 @@ void CheckActive(LifeParam *lp)
     lp->active.right = 0;
     for (y = 0; y < lp->bitmap->height; y++) {
         for (x = 0; x < lp->bitmap->width; x++) {
-            if (TextScreen_GetCell(lp->bitmap, x, y) == lp->aliveChar) {
+            if (TextScreen_GetCell(lp->bitmap, x, y) == lp->surviveChar) {
                 if (x < lp->active.left) lp->active.left = x;
                 if (x > lp->active.right) lp->active.right = x;
                 if (y < lp->active.top) lp->active.top = y;
                 if (y > lp->active.bottom) lp->active.bottom = y;
+                count++;
             }
         }
     }
-    if (lp->active.left > lp->active.right) lp->active.left = lp->active.right;
-    if (lp->active.top > lp->active.bottom) lp->active.top = lp->active.bottom;
+    if (lp->active.left > lp->active.right) {
+        lp->active.left = lp->active.right;
+        lp->active.top = lp->active.bottom;
+        count = 0;
+    }
+    return count;
 }
 
 // -------------------------------------------------------------
@@ -201,31 +249,31 @@ void NextGeneration(LifeParam *lp)
                 int w, h;
                 w = lp->bitmap->width;
                 h = lp->bitmap->height;
-                neighbor = (TextScreen_GetCell(bitmapSrc, (x - 1 + w) % w, (y - 1 + h) % h) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, (x + 0 + w) % w, (y - 1 + h) % h) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, (x + 1 + w) % w, (y - 1 + h) % h) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, (x - 1 + w) % w, (y + 0 + h) % h) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, (x + 1 + w) % w, (y + 0 + h) % h) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, (x - 1 + w) % w, (y + 1 + h) % h) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, (x + 0 + w) % w, (y + 1 + h) % h) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, (x + 1 + w) % w, (y + 1 + h) % h) == lp->aliveChar);
+                neighbor = (TextScreen_GetCell(bitmapSrc, (x - 1 + w) % w, (y - 1 + h) % h) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, (x + 0 + w) % w, (y - 1 + h) % h) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, (x + 1 + w) % w, (y - 1 + h) % h) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, (x - 1 + w) % w, (y + 0 + h) % h) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, (x + 1 + w) % w, (y + 0 + h) % h) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, (x - 1 + w) % w, (y + 1 + h) % h) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, (x + 0 + w) % w, (y + 1 + h) % h) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, (x + 1 + w) % w, (y + 1 + h) % h) == lp->surviveChar);
             } else {
-                neighbor = (TextScreen_GetCell(bitmapSrc, x - 1, y - 1) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, x + 0, y - 1) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, x + 1, y - 1) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, x - 1, y + 0) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, x + 1, y + 0) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, x - 1, y + 1) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, x + 0, y + 1) == lp->aliveChar)
-                         + (TextScreen_GetCell(bitmapSrc, x + 1, y + 1) == lp->aliveChar);
+                neighbor = (TextScreen_GetCell(bitmapSrc, x - 1, y - 1) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, x + 0, y - 1) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, x + 1, y - 1) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, x - 1, y + 0) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, x + 1, y + 0) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, x - 1, y + 1) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, x + 0, y + 1) == lp->surviveChar)
+                         + (TextScreen_GetCell(bitmapSrc, x + 1, y + 1) == lp->surviveChar);
             }
-            if (TextScreen_GetCell(bitmapSrc, x, y) == lp->aliveChar) {
-                if (lp->rule_alive[neighbor]) {
-                    TextScreen_PutCell(bitmapDst, x, y, lp->aliveChar);
+            if (TextScreen_GetCell(bitmapSrc, x, y) == lp->surviveChar) {
+                if (lp->rule_survive[neighbor]) {
+                    TextScreen_PutCell(bitmapDst, x, y, lp->surviveChar);
                 }
             } else {
                 if (lp->rule_born[neighbor]) {
-                    TextScreen_PutCell(bitmapDst, x, y, lp->aliveChar);
+                    TextScreen_PutCell(bitmapDst, x, y, lp->surviveChar);
                     if (x < lp->active.left) lp->active.left = x;
                     if (x > lp->active.right) lp->active.right = x;
                     if (y < lp->active.top) lp->active.top = y;
@@ -240,8 +288,451 @@ void NextGeneration(LifeParam *lp)
     lp->genCount++;
 }
 
+// =============================================================
+// Text Parse Utility
+// =============================================================
 // -------------------------------------------------------------
-// Clipboard (Copy) (Clipboard action is currently Windows only)
+// To lowercase
+// -------------------------------------------------------------
+void ToLowercase(char *str)
+{
+    while (*str) {
+        if ((*str >= 'A') && (*str <= 'Z')) {
+            *str = *str + ('a' - 'A');
+        }
+        str++;
+    }
+}
+
+// -------------------------------------------------------------
+// To uppercase
+// -------------------------------------------------------------
+void ToUppercase(char *str)
+{
+    while (*str) {
+        if ((*str >= 'a') && (*str <= 'z')) {
+            *str = *str - ('a' - 'A');
+        }
+        str++;
+    }
+}
+
+// -------------------------------------------------------------
+// Triming head and tail spaces, tabs
+// -------------------------------------------------------------
+void TrimSpace(char *str)
+{
+    char *src = str;
+    char *dst = str;
+    
+    while ((*src == ' ') || (*src == '\t'))
+        src++;
+    while (*src)
+        *dst++ = *src++;
+    *dst = 0;
+    while ((*dst == 0) || (*dst == ' ') || (*dst == '\t')) {
+        *dst = 0;
+        if (dst == str)
+            break;
+        dst--;
+    }
+}
+
+// -------------------------------------------------------------
+// Skip white space (' ' or tabs)
+// -------------------------------------------------------------
+void SkipWhiteSpace(char **p)
+{
+    while ((**p == ' ') || (**p == '\t'))
+        (*p)++;
+}
+
+// -------------------------------------------------------------
+// Skip to next line
+// -------------------------------------------------------------
+void SkipToNextLine(char **p)
+{
+    while ((**p) && (**p != 0x0a))
+        (*p)++;
+    if (**p == 0x0a)
+        (*p)++;
+}
+
+// -------------------------------------------------------------
+// end of line ?
+// -------------------------------------------------------------
+int isEndOfLine(char **p)
+{
+    return ((**p == 0) || (**p == 0x0a) || (**p == 0x0d));
+}
+
+// -------------------------------------------------------------
+// end of data ?
+// -------------------------------------------------------------
+int isEndOfData(char **p)
+{
+    return (**p == 0);
+}
+
+// -------------------------------------------------------------
+// Extract Key and Value (key<eq>value<delim>)
+// -------------------------------------------------------------
+void ExtractKeyValue(char *key, int keylen, char *val, int vallen, char **p, char eq, char delim)
+{
+    int kp = 0, vp = 0;
+    
+    key[0] = 0;
+    val[0] = 0;
+    
+    while(!isEndOfLine(p) && (**p != delim) && (**p != eq)) {
+        if (kp < keylen - 1) {
+            key[kp++] = **p;
+        }
+        (*p)++;
+    }
+    key[kp++] = 0;
+    if (isEndOfLine(p)) {
+        return;
+    }
+    if (**p == delim) {
+        (*p)++;
+        return;
+    }
+    if (**p == eq) {
+        (*p)++;
+    }
+    while(!isEndOfLine(p) && (**p != delim)) {
+        if (vp < vallen - 1) {
+            val[vp++] = **p;
+        }
+        (*p)++;
+    }
+    val[vp++] = 0;
+    if (**p == delim) {
+        (*p)++;
+    }
+    TrimSpace(key);
+    TrimSpace(val);
+}
+
+// -------------------------------------------------------------
+// Extract line (current pos to end of line)
+// -------------------------------------------------------------
+void ExtractLine(char *buf, int buflen, char **p)
+{
+    int  bufp = 0;
+    
+    while(!isEndOfLine(p)) {
+        if (bufp < buflen - 1) {
+            buf[bufp++] = **p;
+        }
+        (*p)++;
+    }
+    buf[bufp++] = 0;
+    TrimSpace(buf);
+}
+// =============================================================
+// end of Parse Utility
+// =============================================================
+
+// -------------------------------------------------------------
+// Set rules
+// string format:
+//     Bbb/Sss (eg. B3/S23  B36/S23)
+//     Sss/Bbb (eg. S23/B3  S23/B36)
+//     sss/bbb (eg. 23/3    23/36)
+//     BbbSss, B=bb/S=ss also readable.
+// -------------------------------------------------------------
+void SetRules(LifeParam *lp, const char *srule)
+{
+    int  i;
+    int  prefixExist;
+    char prefix;
+    char rule[64];
+    
+    // make string copy
+    snprintf_a(rule, sizeof(rule), srule);
+    
+    // trim and lowercase
+    TrimSpace(rule);
+    ToLowercase(rule);
+    if (!rule[0]) {  // if no rules then set default
+        SetDefaultRules(lp);
+        return;
+    }
+    
+    // reset rule
+    for (i = 0; i < 9; i++) {
+        lp->rule_survive[i] = 0;
+        lp->rule_born[i]    = 0;
+    }
+    
+    prefixExist =  ((rule[0] == 'b') || (rule[0] == 's'));
+    
+    i = 0;
+    prefix = 's';
+    while (rule[i]) {
+        if ((rule[i] == 'b') || (rule[i] == 's'))
+            prefix = rule[i];
+        if ((rule[i] == '/') && (!prefixExist))
+            prefix = 'b';
+        if ((rule[i] >= '0') && (rule[i] <= '8')) {
+            if (prefix == 'b') {
+                lp->rule_born[rule[i] - '0'] = 1;
+            }
+            if (prefix == 's') {
+                lp->rule_survive[rule[i] - '0'] = 1;
+            }
+        }
+        i++;
+    }
+}
+
+// -------------------------------------------------------------
+// Parse RLE header
+// See http://www.conwaylife.com/wiki/RLE
+// -------------------------------------------------------------
+char *ParseRLEHeader(LifeParam *lp, char *rletext)
+{
+    char *p;
+    char buf[256], vbuf[256];
+    char tmp[512];
+    char op;
+    
+    ClearPatternInfo(lp);
+    SetDefaultRules(lp);
+    
+    p = rletext;
+    SkipWhiteSpace(&p);
+    while(*p == '#') {
+        p++;
+        op = *p++;
+        switch (op) {
+            case 'C':  // comment line
+            case 'c':  // same as 'C' (deprecated)
+                ExtractLine(buf, sizeof(buf), &p);
+                if (lp->comment[0]) {
+                    snprintf_a(tmp, sizeof(tmp), "%s", lp->comment);
+                    snprintf_a(lp->comment, sizeof(lp->comment), "%s\n  %s", tmp, buf);
+                } else {
+                    snprintf_a(lp->comment, sizeof(lp->comment), "  %s", buf);
+                }
+                break;
+            case 'N':  // pattern name 
+                ExtractLine(lp->name, sizeof(lp->name), &p);
+                break;
+            case 'O':  // Author and Create date
+                ExtractLine(lp->author, sizeof(lp->author), &p);
+                break;
+            case 'P':  // represent coordinate (top left)
+                ExtractLine(buf, sizeof(buf), &p);
+                break;
+            case 'R':  // pattern coodinate (top left)
+                ExtractLine(buf, sizeof(buf), &p);
+                break;
+            case 'r':  // rules for the pattern 23/3 B3/S23 B36/S23 (B=born, S=survive)
+                ExtractLine(buf, sizeof(buf), &p);
+                SetRules(lp, buf);
+                break;
+            default:
+                break;
+        }
+        SkipToNextLine(&p);
+        SkipWhiteSpace(&p);
+    }
+    
+    // if no header line (x,y,rule) then return
+    if (((*p >= '0') && (*p <= '9')) || (*p == 'b') || (*p == 'o') || (*p == '$'))
+        return p;
+    
+    // read header line (defined x,y,rule)
+    while(!isEndOfLine(&p)) {
+        ExtractKeyValue(buf, sizeof(buf), vbuf, sizeof(vbuf), &p, '=', ',');
+        ToLowercase(buf);
+        if (!strcmp(buf, "x")) {
+            lp->patternWidth = atoi(vbuf);
+        }
+        if (!strcmp(buf, "y")) {
+            lp->patternHeight = atoi(vbuf);
+        }
+        if (!strcmp(buf, "rule")) {
+            SetRules(lp, vbuf);
+        }
+    }
+    SkipToNextLine(&p);
+    return p;
+}
+
+// -------------------------------------------------------------
+// Parse RLE format (ignore header)
+// See http://www.conwaylife.com/wiki/RLE
+// -------------------------------------------------------------
+void ParseRLE(LifeParam *lp, char *rletext)
+{
+    int index = 0;
+    int quit = 0;
+    int x = 0;
+    int y = 0;
+    int snum = 0;
+    int i;
+    
+    while (rletext[index]) {
+        switch (rletext[index]) {
+            case 0x0a:
+            case 0x0d:
+                break;
+            case 0x09:
+            case ' ':
+                snum = 0;
+                break;
+            case '0':  // num of run length
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                snum = snum * 10 + (rletext[index] - '0');
+                break;
+            case 'B':
+            case 'b':  // born
+                if (snum == 0) snum = 1;
+                x += snum;
+                snum = 0;
+                break;
+            case 'O':
+            case 'o':  // survive
+                if (snum == 0) snum = 1;
+                for (i = 0; i < snum; i++) {
+                    TextScreen_PutCell(lp->bitmap, x, y, lp->surviveChar);
+                    x++;
+                }
+                snum = 0;
+                break;
+            case '$':  // line feed
+                if (snum == 0) snum = 1;
+                x = 0;
+                y += snum;
+                if (y >= lp->bitmap->height) quit = 1;
+                snum = 0;
+                break;
+            case '!':  // end of data
+                quit = 1;
+                break;
+            case '#':  // comment line
+            case 'X':  // header x = **
+            case 'x':  // header x = **
+            default:
+                while (rletext[index] && rletext[index] != 0x0a) {
+                    index++;
+                }
+                if (rletext[index] == 0) quit = 1;
+                break;
+        }
+        if (quit) break;
+        index++;
+    }
+}
+
+// -------------------------------------------------------------
+// Parse plain text header
+// See http://www.conwaylife.com/wiki/Plaintext
+// -------------------------------------------------------------
+char *ParsePlainTextHeader(LifeParam *lp, char *plaintext)
+{
+    char *p;
+    char buf[256], vbuf[256];
+    char key[256];
+    char tmp[512];
+    
+    ClearPatternInfo(lp);
+    SetDefaultRules(lp);
+    
+    p = plaintext;
+    SkipWhiteSpace(&p);
+    while(*p == '!') {
+        p++;
+        ExtractKeyValue(buf, sizeof(buf), vbuf, sizeof(vbuf), &p, ':', ',');
+        snprintf_a(key, sizeof(tmp), "%s", buf);
+        ToLowercase(key);
+        if (!strcmp(key, "name")) {
+            snprintf_a(lp->name, sizeof(lp->name), "%s", vbuf);
+        } else if (!strcmp(key, "author")) {
+            snprintf_a(lp->author, sizeof(lp->author), "%s", vbuf);
+        } else if (!strcmp(key, "rule")) {
+            SetRules(lp, vbuf);
+        } else {
+            if (lp->comment[0]) {
+                snprintf_a(tmp, sizeof(tmp), "%s", lp->comment);
+                snprintf_a(lp->comment, sizeof(lp->comment), "%s\n  %s", tmp, buf);
+            } else {
+                snprintf_a(lp->comment, sizeof(lp->comment), "  %s", buf);
+            }
+        }
+        SkipToNextLine(&p);
+        SkipWhiteSpace(&p);
+    }
+    return p;
+}
+
+// -------------------------------------------------------------
+// Parse plain text
+// This code can read Plaintext format of http://www.conwaylife.com/wiki/Main_Page
+// and clipboard data made by this program.
+// About Plaintext format, see See http://www.conwaylife.com/wiki/Plaintext
+// -------------------------------------------------------------
+void ParsePlainText(LifeParam *lp, char *plaintext)
+{
+    int index = 0;
+    int quit = 0;
+    int x = 0;
+    int y = 0;
+    
+    while (plaintext[index]) {
+        switch (plaintext[index]) {
+            case 0x0a:
+                x = 0;
+                y++;
+                if (y >= lp->bitmap->height) {
+                    quit = 1;
+                }
+                break;
+            case 0x0d:
+                break;
+            case 'O':   // for http://www.conwaylife.com/wiki/Plaintext
+            case BOARD_SURVIVE_CHAR:
+                TextScreen_PutCell(lp->bitmap, x, y, lp->surviveChar);
+                x++;
+                break;
+            case '!':
+                while (plaintext[index] && (plaintext[index] != 0x0a)) {
+                    index++;
+                }
+                if (plaintext[index] == 0x0a) {
+                    x = 0;
+                    y++;
+                    if (y >= lp->bitmap->height) {
+                        quit = 1;
+                    }
+                }
+                if (plaintext[index] == 0) {
+                    quit = 1;
+                }
+                break;
+            default:
+                x++;
+                break;
+        }
+        if (quit) break;
+        index++;
+    }
+}
+
+// -------------------------------------------------------------
+// Clipboard (Copy)
 // -------------------------------------------------------------
 int SaveToClipboard(LifeParam *lp)
 {
@@ -261,7 +752,7 @@ int SaveToClipboard(LifeParam *lp)
             for (y = 0; y < lp->bitmap->height; y++) {
                 for (x = 0; x < lp->bitmap->width; x++) {
                     cell = TextScreen_GetCell(lp->bitmap, x, y);
-                    p[index++] = (cell == lp->aliveChar ? '#' : cell);
+                    p[index++] = (cell == lp->surviveChar) ? BOARD_SURVIVE_CHAR : BOARD_SPACE_CHAR;
                 }
                 p[index++] = 0x0d;
                 p[index++] = 0x0a;
@@ -278,137 +769,38 @@ int SaveToClipboard(LifeParam *lp)
     }
     return 0;
 #else
-    return 0;
+    FILE *fp;
+    char cell;
+    int  x, y, ret = 0;
+    
+    // use xsel command to put data to clipboard
+    fp = popen("xsel --clipboard --input", "w");
+    if (fp == NULL) {
+        return -1;
+    }
+    for (y = 0; y < lp->bitmap->height; y++) {
+        for (x = 0; x < lp->bitmap->width; x++) {
+            cell = TextScreen_GetCell(lp->bitmap, x, y);
+            cell = (cell == lp->surviveChar) ? BOARD_SURVIVE_CHAR : BOARD_SPACE_CHAR;
+            if (fputc(cell, fp) == EOF) {
+                ret = -1;
+                break;
+            }
+        }
+        if (ret) break;
+        if (fputc(0x0a, fp) == EOF) {
+            ret = -1;
+            break;
+        }
+    }
+    pclose(fp);
+    
+    return ret;
 #endif
 }
 
 // -------------------------------------------------------------
-// Parse RLE format (ignore header)
-// The rule assumes B3/S23
-// See http://www.conwaylife.com/wiki/RLE
-// -------------------------------------------------------------
-void ParseRLE(LifeParam *lp, char *rletext)
-{
-    int index = 0;
-    int quit = 0;
-    int x = 0;
-    int y = 0;
-    int snum = 0;
-    int i;
-    
-    while (rletext[index]) {
-        switch (rletext[index]) {
-            case 0x0d:
-            case 0x09:
-            case ' ':
-                snum = 0;
-                break;
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                snum = snum * 10 + (rletext[index] - '0');
-                break;
-            case 'B':
-            case 'b':
-                if (snum == 0) snum = 1;
-                for (i = 0; i < snum; i++) {
-                    x++;
-                }
-                snum = 0;
-                break;
-            case 'O':
-            case 'o':
-                if (snum == 0) snum = 1;
-                for (i = 0; i < snum; i++) {
-                    TextScreen_PutCell(lp->bitmap, x, y, lp->aliveChar);
-                    x++;
-                }
-                snum = 0;
-                break;
-            case '$':
-                if (snum == 0) snum = 1;
-                x = 0;
-                y += snum;
-                if (y >= lp->bitmap->height) quit = 1;
-                snum = 0;
-                break;
-            case '!':
-                quit = 1;
-                break;
-            case '#':
-            case 'X':
-            case 'x':
-            default:
-                while (rletext[index]) {
-                    if(rletext[index] == 0x0a) {
-                        break;
-                    }
-                    index++;
-                }
-                if (rletext[index] == 0) quit = 1;
-                break;
-        }
-        if (quit) break;
-        index++;
-    }
-}
-
-// -------------------------------------------------------------
-// parse plain text
-// This code can read Plaintext format of  http://www.conwaylife.com/wiki/Main_Page
-// and clipboard data made by this program.
-// -------------------------------------------------------------
-void ParsePlainText(LifeParam *lp, char *plaintext)
-{
-    int index = 0;
-    int quit = 0;
-    int x = 0;
-    int y = 0;
-    
-    while (plaintext[index]) {
-        switch (plaintext[index]) {
-            case 0x0a:
-                x = 0;
-                y++;
-                if (y >= lp->bitmap->height) quit = 1;
-                break;
-            case 0x0d:
-                break;
-            case 'O':   // for http://www.conwaylife.com/wiki/Plaintext
-            case '#':
-                TextScreen_PutCell(lp->bitmap, x, y, lp->aliveChar);
-                x++;
-                break;
-            case '!':
-                while (plaintext[index]) {
-                    if (plaintext[index] == 0x0a) {
-                        x = 0;
-                        y++;
-                        if (y >= lp->bitmap->height) quit = 1;
-                        break;
-                    }
-                    index++;
-                }
-                if (plaintext[index] == 0) quit = 1;
-                break;
-            default:
-                x++;
-                break;
-        }
-        if (quit) break;
-        index++;
-    }
-}
-
-// -------------------------------------------------------------
-// Clipboard (Paste) (Clipboard action is currently Windows only)
+// Clipboard (Paste)
 // -------------------------------------------------------------
 int LoadFromClipboard(LifeParam *lp)
 {
@@ -423,7 +815,6 @@ int LoadFromClipboard(LifeParam *lp)
         cdata = GetClipboardData(CF_TEXT);
         if (cdata) {
             p= (char *)GlobalLock(cdata);
-            
             while (p[lencount]) {
                 lencount++;
             }
@@ -433,31 +824,83 @@ int LoadFromClipboard(LifeParam *lp)
                     memcpy(localdata, p, lencount + 1);
                 }
             }
-            
             GlobalUnlock(cdata);
         }
         CloseClipboard();
     }
+#else
+    char buf[1024];
+    char *p, *localdata;
+    FILE *fp;
+    int  memsize = 8192;
+    int  expandsize = 8192;
+    int  pos = 0;
+    
+    // get initial buffer
+    localdata = (char *)malloc(memsize);
+    if (!localdata) return -1;
+    
+    // use xsel command to get from clipboard
+    fp = popen("xsel --clipboard --output", "r");
+    if (fp == NULL) {
+        free(localdata);
+        return -1;
+    }
+    while(1) {
+        p = fgets(buf, sizeof(buf), fp);
+        if (p == NULL) break;
+        while (*p) {
+            localdata[pos++] = *p;
+            p++;
+            // expand buffer
+            if (pos >= memsize) {
+                char *tmp;
+                tmp = (char *)malloc(memsize + expandsize);
+                if (!tmp) {
+                    free(localdata);
+                    pclose(fp);
+                    return -1;
+                }
+                memcpy(tmp, localdata, pos);
+                free(localdata);
+                localdata = tmp;
+                memsize += expandsize;
+            }
+        }
+        if (feof(fp))  break;
+    }
+    localdata[pos] = 0;
+    pclose(fp);
+    
+    // clipboard was empty
+    if (!localdata[0]) {
+        free(localdata);
+        localdata = NULL;
+    }
+#endif
     
     if (localdata) {
         TextScreenBitmap *tempbitmap;
         int index, rle;
+        char *pdata;
         
         rle = 0;
         index = 0;
-        // check header
-        // plain text or 'http://www.conwaylife.com/wiki/' s RLE,plain format
+        // detect Plaintext or RLE format
         while(localdata[index]) {
+            while((localdata[index] == ' ') || (localdata[index] == '\t')) {
+                index++;
+            }
             if((localdata[index] == '#') || (localdata[index] == '!')) {
-                while((localdata[index] != 0) && (localdata[index] != 0x0a)) {
+                while(localdata[index] && (localdata[index] != 0x0a)) {
                     index++;
                 }
                 if (localdata[index] == 0) break;
-            } else if ((localdata[index] != 0x0d) && (localdata[index] != 0x0a) 
-                        && (localdata[index] != ' ') && (localdata[index] != 0x09)) {
-                if ((localdata[index] == 'x') || (localdata[index] == 'X')) {
-                    rle = 1;
-                }
+            } else if ((localdata[index] == '$') || (localdata[index] == 'x') ||
+                       (localdata[index] == 'y') || (localdata[index] == 'B') ||
+                       (localdata[index] == 'b') || (localdata[index] == 'o')) {
+                // use char $,x,y,B,b,o in the data, then RLE
+                rle = 1;
                 break;
             }
             index++;
@@ -465,14 +908,22 @@ int LoadFromClipboard(LifeParam *lp)
         
         // parse data
         TextScreen_ClearBitmap(lp->bitmap);
+        pdata = localdata;
         if (rle) {
-            ParseRLE(lp, localdata);
+            pdata = ParseRLEHeader(lp, pdata);
+            ParseRLE(lp, pdata);
         } else {
-            ParsePlainText(lp, localdata);
+            pdata = ParsePlainTextHeader(lp, pdata);
+            ParsePlainText(lp, pdata);
         }
         
         // loaded pattern move to center of bitmap
-        CheckActive(lp);
+        if (CheckActive(lp)) {
+            if (!lp->patternWidth && !lp->patternHeight) {  // if pattern size was not found from header
+                lp->patternWidth  = lp->active.right - lp->active.left + 1;
+                lp->patternHeight = lp->active.bottom - lp->active.top + 1;
+            }
+        }
         tempbitmap = TextScreen_DupBitmap(lp->bitmap);
         TextScreen_ClearBitmap(lp->bitmap);
         TextScreen_CopyBitmap(lp->bitmap, tempbitmap,
@@ -484,9 +935,6 @@ int LoadFromClipboard(LifeParam *lp)
         return 1;
     }
     return 0;
-#else
-    return 0;
-#endif
 }
 
 // -------------------------------------------------------------
@@ -496,24 +944,23 @@ void PrintHelp(LifeParam *lp) {
     TextScreen_ClearScreen();
     TextScreen_SetCursorVisible(0);
     printf("\n\n");
-    printf("  version info:\n");
+    printf("  Version Info.\n");
     printf("  conways_game_of_life by Coffey 2015-2016\n");
     printf("  version %s  build: %s %s\n", VERSION_STR, __DATE__, __TIME__);
     printf("\n");
     printf("  [PageDown][s]slow  [PageUp][f]fast\n");
     printf("  [Enter][e]edit  [space]pause  [n]next generation\n");
     printf("  [arrow key]move view  [Home]reset view\n");
-    printf("  [c]copy to clipboard(Windows Only)  [b]border/borderless\n");
-    printf("  [u]edit alive/born rule  [y]edit field size\n");
-    printf("  [r]restart  [h]help  [q]quit\n");
+    printf("  [c]copy to clipboard  [b]border/borderless\n");
+    printf("  [u]edit survive/born rule  [y]edit field size\n");
+    printf("  [r]restart  [h]help  [i]info  [q]quit\n");
     printf("\n");
     printf("  Edit Mode:\n");
     printf("  [space]toggle  [arrow key]move cursor  [Enter][e]start\n");
-    printf("  [x]clear  [c]copy to clipboard(Windows Only)\n");
-    printf("  [v]paste from clipboard(Windows Only)\n");
+    printf("  [x]clear  [c]copy to clipboard  [v]paste from clipboard\n");
     printf("  [r]read  [s]store  [p]load preset pattern\n");
-    printf("  [u]edit alive/born rule  [y]edit field size\n");
-    printf("  [h]help  [q]quit\n");
+    printf("  [u]edit survive/born rule  [y]edit field size\n");
+    printf("  [h]help  [i]info  [q]quit\n");
     printf("\n");
     printf("  hit any key\n");
     fflush(stdout);
@@ -525,6 +972,49 @@ void PrintHelp(LifeParam *lp) {
             if (lp->quit) break;
         }
     }
+    TextScreen_SetCursorVisible(0);
+}
+
+// -------------------------------------------------------------
+// print board info
+// -------------------------------------------------------------
+void PrintInfo(LifeParam *lp) {
+    TextScreen_ClearScreen();
+    TextScreen_SetCursorVisible(0);
+    printf("\n\n");
+    printf("  Pattern Info.\n");
+    printf("\n");
+    printf("  Pattern Name : %s\n", lp->name);
+    printf("  Author       : %s\n", lp->author);
+    if ((!lp->patternWidth) && (!lp->patternHeight)) {
+        printf("  Initial Size : n/a\n");
+    } else {
+        printf("  Initial Size : %d x %d\n", lp->patternWidth, lp->patternHeight);
+    }
+    printf("  Rule(Survive): %d%d%d%d%d%d%d%d%d\n", lp->rule_survive[0], lp->rule_survive[1],
+                                                    lp->rule_survive[2], lp->rule_survive[3],
+                                                    lp->rule_survive[4], lp->rule_survive[5],
+                                                    lp->rule_survive[6], lp->rule_survive[7],
+                                                    lp->rule_survive[8]);
+    printf("  Rule(Born)   : %d%d%d%d%d%d%d%d%d\n", lp->rule_born[0], lp->rule_born[1],
+                                                    lp->rule_born[2], lp->rule_born[3],
+                                                    lp->rule_born[4], lp->rule_born[5],
+                                                    lp->rule_born[6], lp->rule_born[7],
+                                                    lp->rule_born[8]);
+    printf("\n");
+    printf("  Comment      :\n%s\n", lp->comment);
+    printf("\n");
+    printf("  hit any key\n");
+    fflush(stdout);
+    {  // wait any key
+        int key = 0;
+        while (!key) {
+            key = TextScreen_GetKey();
+            TextScreen_Wait(50);
+            if (lp->quit) break;
+        }
+    }
+    TextScreen_ClearScreen();
     TextScreen_SetCursorVisible(0);
 }
 
@@ -541,13 +1031,13 @@ void SetRule(LifeParam *lp)
     TextScreen_SetCursorVisible(1);
     
     TextScreen_SetCursorPos(0,2);
-    printf("  Edit Alive/Born rules.\n");
+    printf("  Edit Survive/Born rules.\n");
     printf("\n");
     printf("                012345678\n");
     printf("  ------------------------\n");
-    printf("  Stays alive : ");
+    printf("  Survive     : ");
     for (i = 0; i < 9; i++) {
-        printf("%d", lp->rule_alive[i]);
+        printf("%d", lp->rule_survive[i]);
     }
     printf("\n");
     printf("  Born        : ");
@@ -577,8 +1067,8 @@ void SetRule(LifeParam *lp)
                 case ' ':  // toggle rule
                     switch (cury) {
                         case 0:
-                            lp->rule_alive[curx] = !(lp->rule_alive[curx]);
-                            printf("%d", lp->rule_alive[curx]); 
+                            lp->rule_survive[curx] = !(lp->rule_survive[curx]);
+                            printf("%d", lp->rule_survive[curx]); 
                             TextScreen_SetCursorPos(curoffsetx + curx, curoffsety + cury);
                             break;
                         case 1:
@@ -592,7 +1082,7 @@ void SetRule(LifeParam *lp)
                     SetDefaultRules(lp);
                     TextScreen_SetCursorPos(curoffsetx + 0, curoffsety + 0);
                     for (i = 0; i < 9; i++) {
-                        printf("%d", lp->rule_alive[i]);
+                        printf("%d", lp->rule_survive[i]);
                     }
                     TextScreen_SetCursorPos(curoffsetx + 0, curoffsety + 1);
                     for (i = 0; i < 9; i++) {
@@ -697,7 +1187,7 @@ void SetBoardSize(LifeParam *lp)
                         n[cury] = n[cury] - (n[cury] % 50);
                     }
                     if (n[cury] < 10) n[cury] = 10;
-                    if (n[cury] > 10000) n[cury] = 10000;
+                    if (n[cury] > BOARD_SIZE_MAX) n[cury] = BOARD_SIZE_MAX;
                     TextScreen_SetCursorVisible(0);
                     TextScreen_SetCursorPos(0, curoffsety);
                     printf("  Width  : %5d\n", n[0]);
@@ -756,19 +1246,30 @@ void LoadPreset(LifeParam *lp)
     // Preset Patterns ("title", "1st line", "2nd line", ... "")
     char *preset_pattern[] = {
         // F(R) pentomino
-        "F(R) pentomino",
+        "R-pentomino (F-pentomino)",
+        "S23/B3",
         ".##",
         "##",
         ".#",
         "",
+        // F-heptomino
+        "F-heptomino",
+        "S23/B3",
+        "##",
+        ".#",
+        ".#",
+        ".###",
+        "",
         // Glider
         "Glider",
+        "S23/B3",
         ".#",
         "..#",
         "###",
         "",
         // Spaceship
         "Spaceship (lightweight, middleweight, heavyweight)",
+        "S23/B3",
         ".........................#..#",
         ".............................#",
         "...............#.........#...#",
@@ -788,6 +1289,7 @@ void LoadPreset(LifeParam *lp)
         "",
         // Spaceship Crash
         "Spaceship Crash",
+        "S23/B3",
         "..#.........................................#",
         "#...#.....................................#...#",
         ".....#...................................#",
@@ -803,18 +1305,21 @@ void LoadPreset(LifeParam *lp)
         "",
         // Diehard
         "Diehard",
+        "S23/B3",
         "......#",
         "##",
         ".#...###",
         "",
         // Acom
         "Acom",
+        "S23/B3",
         ".#",
         "...#",
         "##..###",
         "",
         // Gosper Glider Gun
         "Gosper Glider Gun",
+        "S23/B3",
         "........................#",
         "......................#.#",
         "............##......##",
@@ -827,6 +1332,7 @@ void LoadPreset(LifeParam *lp)
         "",
         // Pulsar
         "Pulsar",
+        "S23/B3",
         "..###...###",
         ".",
         "#....#.#....#",
@@ -843,6 +1349,7 @@ void LoadPreset(LifeParam *lp)
         "",
         // Kok's Galaxy
         "Kok's Galaxy",
+        "S23/B3",
         "######.##",
         "######.##",
         ".......##",
@@ -855,9 +1362,18 @@ void LoadPreset(LifeParam *lp)
         "",
         // Pentadecathlon
         "Pentadecathlon",
+        "S23/B3",
         "..#....#",
         "##.####.##",
         "..#....#",
+        "",
+        // The replicator
+        "The reeplicator (S23/B36)",
+        "S23/B36",
+        ".###",
+        "#",
+        "#",
+        "#",
         "",
         // data termination string
         "" };
@@ -934,34 +1450,41 @@ void LoadPreset(LifeParam *lp)
         TextScreen_Wait(10);
     }
     if (cury) {  // selected
-        int str_n = 0, pattern_n = 1, p = 0, title = 1;
+        int str_n = 0, pattern_n = 1, p = 0, line;
         TextScreenBitmap *tempbitmap;
         int x, y;
         
+        ClearPatternInfo(lp);
         TextScreen_ClearBitmap(lp->bitmap);
         
         // load pattern
         while (*preset_pattern[str_n]) {
+            line = 1;
             while (*preset_pattern[str_n]) {
-                if ((cury == pattern_n) && (!title)) {
-                    TextScreen_DrawText(lp->bitmap, 0, p++, preset_pattern[str_n]);
-                } else {
-                    title = 0;
+                if (cury == pattern_n) {
+                    if (line == 1) {
+                        snprintf_a(lp->name, sizeof(lp->name), "%s", preset_pattern[str_n]);
+                    } else if (line == 2) {
+                        SetRules(lp, preset_pattern[str_n]);
+                    } else {
+                        TextScreen_DrawText(lp->bitmap, 0, p++, preset_pattern[str_n]);
+                    }
                 }
                 str_n++;
+                line++;
             }
             pattern_n++;
             if (pattern_n > cury)
                 break;
-            title = 1;
             str_n++;
         }
+        snprintf_a(lp->comment, sizeof(lp->comment), "%s", "  Load from preset pattern.");
         
         // convert to internal format
         for (y = 0; y < lp->bitmap->height; y++) {
             for (x = 0; x < lp->bitmap->width; x++) {
                 if (TextScreen_GetCell(lp->bitmap, x, y) == '#') {
-                    TextScreen_PutCell(lp->bitmap, x, y, lp->aliveChar);
+                    TextScreen_PutCell(lp->bitmap, x, y, lp->surviveChar);
                 } else {
                     TextScreen_ClearCell(lp->bitmap, x, y);
                 }
@@ -970,6 +1493,8 @@ void LoadPreset(LifeParam *lp)
         
         // move loaded pattern to center of bitmap
         CheckActive(lp);
+        lp->patternWidth  = lp->active.right - lp->active.left + 1;
+        lp->patternHeight = lp->active.bottom - lp->active.top + 1;
         tempbitmap = TextScreen_DupBitmap(lp->bitmap);
         TextScreen_ClearBitmap(lp->bitmap);
         TextScreen_CopyBitmap(lp->bitmap, tempbitmap,
@@ -1022,11 +1547,7 @@ void EditBoard(LifeParam *lp)
 {
     int quit = 0;
     int curx, cury;
-#ifdef _WIN32
     char *helptext = "  [space]toggle [Enter]start [x]clear [v]paste [r]read [s]store [h]help";
-#else
-    char *helptext = "  [space]toggle [Enter]start [x]clear [r]read [s]store [h]help         ";
-#endif
 
 #define EDITBOARD_CURSORCENTER() {  \
     curx = (lp->setting.width  + 1) / 2 + lp->setting.leftMargin;  \
@@ -1094,11 +1615,13 @@ void EditBoard(LifeParam *lp)
                     TextScreen_ClearBitmap(lp->bitmap);
                     lp->genCount = 0;
                     EDITBOARD_SHOWCENTER();
+                    ClearPatternInfo(lp);
                     break;
                 case 'r':  // read
                     TextScreen_CopyBitmap(lp->bitmap, lp->storebitmap, 0, 0);
                     lp->genCount = 0;
                     EDITBOARD_SHOWCENTER();
+                    ClearPatternInfo(lp);
                     break;
                 case 's':  // store
                     TextScreen_CopyBitmap(lp->storebitmap, lp->bitmap, 0, 0);
@@ -1115,13 +1638,19 @@ void EditBoard(LifeParam *lp)
                         int x, y;
                         x = lp->offsetx + curx - lp->setting.leftMargin;
                         y = lp->offsety + cury - lp->setting.topMargin;
-                        if (TextScreen_GetCell(lp->bitmap, x, y) == lp->aliveChar) {
+                        if (TextScreen_GetCell(lp->bitmap, x, y) == lp->surviveChar) {
                             TextScreen_ClearCell(lp->bitmap, x, y);
                         } else {
-                            TextScreen_PutCell(lp->bitmap, x, y, lp->aliveChar);
+                            TextScreen_PutCell(lp->bitmap, x, y, lp->surviveChar);
                         }
                         TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                     }
+                    break;
+                case 'i':  // show info
+                    PrintInfo(lp);
+                    TextScreen_SetCursorVisible(1);
+                    TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
+                    EDITBOARD_SHOWHELPLINE();
                     break;
                 case 'h':  // show help
                     PrintHelp(lp);
@@ -1230,6 +1759,10 @@ int KeyboardCheck(LifeParam *lp)
             case 'e':  // edit
             case 0x0d:
                 EditBoard(lp);
+                break;
+            case 'i':
+                PrintInfo(lp);
+                TextScreen_ShowBitmap(lp->bitmap, -lp->offsetx, -lp->offsety);
                 break;
             case 'h':  // show help
                 PrintHelp(lp);
