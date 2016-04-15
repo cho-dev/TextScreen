@@ -121,18 +121,22 @@ int main(void)
     {
         int  x, y;
         int  key;
-        int  redraw;
-        char *helptext = "[up/down/left/right]scroll view  [home]reset view  [q][Esc]exit";
+        int  redraw, showlineno;
+        char *helptext = "[arrow key]scroll view  [home]reset view  [l]line No.  [q][Esc]exit";
         
         // draw to screen
         x = 0;
         y = 0;
         key = 0;
         redraw = 1;
+        showlineno = 0;
         // main loop
         while ((key != 'q') && (key != TSK_ESC)) {  // q or esc then quit
             if (key) {
                 switch (key) {
+                    case 'l':
+                        showlineno = !(showlineno);
+                        break;
                     case TSK_ARROW_UP:     // up arrow
                         y++;
                         break;
@@ -160,9 +164,7 @@ int main(void)
                 
                 // draw to screen
                 TextScreen_ClearBitmap(screenmap);
-                if (1) {  //  1:no line number  0:add line number
-                    TextScreen_OverlayBitmap(screenmap, docmap, x, y);
-                } else {
+                if (showlineno) {  //  0:hide line number  1:show line number
                     TextScreen_OverlayBitmap(screenmap, docmap, x + 8, y);
                     for (i = 0; i < screenmap->height - 1; i++) {
                         if ((i - y + 1 > 0) && (i - y + 1 <= max_line)) {
@@ -170,6 +172,8 @@ int main(void)
                             TextScreen_DrawText(screenmap, 0, i, numstr);
                         }
                     }
+                } else {
+                    TextScreen_OverlayBitmap(screenmap, docmap, x, y);
                 }
                 TextScreen_DrawText(screenmap, 0, screenmap->height - 1, helptext);
                 TextScreen_ShowBitmap(screenmap, 0, 0);
