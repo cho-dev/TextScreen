@@ -28,7 +28,7 @@
 // max board size
 #define BOARD_SIZE_MAX      10000
 // version string
-#define VERSION_STR         "1.50"
+#define VERSION_STR         "1.51"
 
 #define BOARD_SPACE_CHAR    '.'
 #define BOARD_SURVIVE_CHAR  '#'
@@ -318,7 +318,7 @@ void ToUppercase(char *str)
 }
 
 // -------------------------------------------------------------
-// Triming head and tail spaces, tabs
+// Triming (remove head and tail spaces, tabs)
 // -------------------------------------------------------------
 void TrimSpace(char *str)
 {
@@ -1368,7 +1368,7 @@ void LoadPreset(LifeParam *lp)
         "..#....#",
         "",
         // The replicator
-        "The reeplicator (S23/B36)",
+        "The replicator (S23/B36)",
         "S23/B36",
         ".###",
         "#",
