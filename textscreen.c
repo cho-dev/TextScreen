@@ -4,7 +4,7 @@
  TextScreen library. (C version)
      by Coffey (c)2015-2016
      
-     VERSION 20160413
+     VERSION 20160416
      
      Windows     : Win2K or later
      Non Windows : console support ANSI escape sequence
@@ -30,7 +30,8 @@
 // #define _POSIX_C_SOURCE 199309L
 // #define _POSIX_C_SOURCE 199506L
 // for snprintf()
-#define _POSIX_C_SOURCE 200112L
+// #define _POSIX_C_SOURCE 200112L
+#define _POSIX_C_SOURCE 200809L
 #include <time.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
@@ -325,7 +326,7 @@ int TextScreen_SIGINT_handler(int sig)
         // Windows: use default ctrl handler (return=0)
 #else
         // Lunux: force exit
-        exit(sig);
+        _exit(sig);
 #endif
     }
     return ret;
@@ -349,8 +350,21 @@ int TextScreen_Init(TextScreenSetting *usersetting)
 #ifdef _WIN32
     ret = !SetConsoleCtrlHandler((PHANDLER_ROUTINE)TextScreen_SIGINT_handler, TRUE);
 #else
-    if (signal(SIGINT, (void *)&TextScreen_SIGINT_handler) == SIG_ERR)
+#if _POSIX_C_SOURCE >= 200809L
+    {
+        struct sigaction new_sa;
+        
+        memset(&new_sa, 0, sizeof(new_sa));
+        new_sa.sa_handler = (void *)TextScreen_SIGINT_handler;
+        new_sa.sa_flags = SA_RESTART;  // SA_RESTART:restart, SA_RESETHAND:reset
+        if (sigaction(SIGINT, &new_sa, NULL))
+            return -1;
+    }
+#else
+    // (old-school)
+    if (signal(SIGINT, (void *)TextScreen_SIGINT_handler) == SIG_ERR)
         return -1;
+#endif  /* end of (_POSIX_C_SOURCE >= 200809L) */
     ret = TextScreen_SetNonBufferedTerm();
 #endif
     return ret;
@@ -1241,6 +1255,7 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
             printf("\n");
         
         for (y = 0; y < gSetting.height; y++) {
+            if (y) { printf("\n"); };
             index = 0;
             for (i = 0; i < gSetting.leftMargin; i++) {
                 buf[index++] = ' ';
@@ -1250,7 +1265,7 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
                 buf[index++] = gSetting.translate[(unsigned char)ch];
             }
             buf[index++] = 0;
-            printf("%s\n", buf);
+            printf("%s", buf);
         }
     }
     
@@ -1260,6 +1275,7 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
             printf("\n");
         
         for (y = 0; y < gSetting.height; y++) {
+            if (y) { printf("\n"); };
             index = 0;
             for (i = 0; i < gSetting.leftMargin; i++) {
                 fputc(' ', stdout);
@@ -1268,7 +1284,6 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
                 ch = TextScreen_GetCell(bitmap, x + dx, y + dy);
                 fputc(gSetting.translate[(unsigned char)ch], stdout);
             }
-            printf("\n");
             TextScreen_Wait(0);
         }
     }
@@ -1284,6 +1299,14 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
 #endif
         }
         for (y = 0; y < gSetting.height; y++) {
+            if (y) {
+#ifdef _WIN32
+                // buf[index++] = 0x0d;
+                buf[index++] = 0x0a;
+#else
+                buf[index++] = 0x0a;
+#endif
+            }
             for (i = 0; i < gSetting.leftMargin; i++) {
                 buf[index++] = ' ';
             }
@@ -1291,12 +1314,6 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
                 ch = TextScreen_GetCell(bitmap, x + dx, y + dy);
                 buf[index++] = gSetting.translate[(unsigned char)ch];
             }
-#ifdef _WIN32
-            // buf[index++] = 0x0d;
-            buf[index++] = 0x0a;
-#else
-            buf[index++] = 0x0a;
-#endif
         }
         buf[index++] = 0;
         printf("%s", buf);
@@ -1313,6 +1330,10 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
             buf[index++] = 0x0a;
         }
         for (y = 0; y < gSetting.height; y++) {
+            if (y) {
+                // buf[index++] = 0x0d;
+                buf[index++] = 0x0a;
+            }
             for (i = 0; i < gSetting.leftMargin; i++) {
                 buf[index++] = ' ';
             }
@@ -1320,8 +1341,6 @@ int TextScreen_ShowBitmap(TextScreenBitmap *bitmap, int dx, int dy)
                 ch = TextScreen_GetCell(bitmap, x + dx, y + dy);
                 buf[index++] = gSetting.translate[(unsigned char)ch];
             }
-            // buf[index++] = 0x0d;
-            buf[index++] = 0x0a;
         }
         stdh = GetStdHandle(STD_OUTPUT_HANDLE);
         if (stdh) {
