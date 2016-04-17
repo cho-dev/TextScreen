@@ -4,7 +4,7 @@
  TextScreen library. (C version)
      by Coffey (c)2015-2016
      
-     VERSION 20160416
+     VERSION 20160417
      
      Windows     : Win2K or later
      Non Windows : console support ANSI escape sequence
@@ -207,15 +207,17 @@ static struct KeySequence gKeyEscSequence [] = {  // (ubuntu default)
     { TSK_ARROW_RIGHT,  3, { 0x1b, 0x5b, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00 }},
     { TSK_ARROW_UP,     3, { 0x1b, 0x5b, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00 }},
     { TSK_ARROW_DOWN,   3, { 0x1b, 0x5b, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00 }},
-    { TSK_INSERT,       4, { 0x1b, 0x5b, 0x32, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
-    { TSK_DELETE,       4, { 0x1b, 0x5b, 0x33, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
+    { TSK_HOME,         3, { 0x1b, 0x5b, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00 }},
+    { TSK_END,          3, { 0x1b, 0x5b, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00 }},
     { TSK_HOME,         3, { 0x1b, 0x4f, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00 }},
     { TSK_END,          3, { 0x1b, 0x4f, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00 }},
-    { TSK_PAGEUP,       4, { 0x1b, 0x5b, 0x35, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
-    { TSK_PAGEDOWN,     4, { 0x1b, 0x5b, 0x36, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
     
+    { TSK_INSERT,       4, { 0x1b, 0x5b, 0x32, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
+    { TSK_DELETE,       4, { 0x1b, 0x5b, 0x33, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
     { TSK_HOME,         4, { 0x1b, 0x5b, 0x31, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
     { TSK_END,          4, { 0x1b, 0x5b, 0x34, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
+    { TSK_PAGEUP,       4, { 0x1b, 0x5b, 0x35, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
+    { TSK_PAGEDOWN,     4, { 0x1b, 0x5b, 0x36, 0x7e, 0x00, 0x00, 0x00, 0x00 }},
     
     { TSK_ARROW_LEFT   | TSK_SHIFT,   6, { 0x1b, 0x5b, 0x31, 0x3b, 0x32, 0x44, 0x00, 0x00 }},
     { TSK_ARROW_RIGHT  | TSK_SHIFT,   6, { 0x1b, 0x5b, 0x31, 0x3b, 0x32, 0x43, 0x00, 0x00 }},
@@ -472,38 +474,30 @@ int TextScreen_GetConsoleSize(int *width, int *height)
 
 int TextScreen_SetCursorPos(int x, int y)
 {
-#ifdef _WIN32
-    HANDLE stdouth;
-    COORD  coord;
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    int    width, height;
-    int    ret;
+    int  width, height;
+    int  ret;
     
-    stdouth = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (!stdouth) return -1;
-    
-    ret = GetConsoleScreenBufferInfo(stdouth, &info);
-    if (ret) {
-        width  = info.srWindow.Right-info.srWindow.Left + 1;
-        height = info.srWindow.Bottom-info.srWindow.Top + 1;
-    } else {
-        return -1;
-    }
+    ret = TextScreen_GetConsoleSize(&width, &height);
+    if (ret) return ret;
     
     if (x < 0) x = 0;
     if (x >= width) x = width - 1;
     if (y < 0) y = 0;
     if (y >= height) y = height - 1;
     
-    coord.X = (SHORT)x;
-    coord.Y = (SHORT)y;
-    SetConsoleCursorPosition(stdouth ,coord);
+#ifdef _WIN32
+    {
+        HANDLE stdouth;
+        COORD  coord;
+        
+        stdouth = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (!stdouth) return -1;
+        
+        coord.X = (SHORT)x;
+        coord.Y = (SHORT)y;
+        SetConsoleCursorPosition(stdouth, coord);
+    }
 #else
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x > 32767) x = 32767;
-    if (y > 32767) y = 32767;
-    
     P_CURSOR_POS(x, y);
 #endif
     return 0;
@@ -598,6 +592,7 @@ void TextScreen_GetSettingDefault(TextScreenSetting *setting)
 {
     int width, height;
     
+    if (!setting) return;
     TextScreen_GetConsoleSize(&width, &height);
     
     setting->space      = SCREEN_DEFAULT_SPACE_CHAR;
@@ -957,7 +952,7 @@ void TextScreen_DrawLine(TextScreenBitmap *bitmap, int x1, int y1, int x2, int y
 
 void TextScreen_DrawText(TextScreenBitmap *bitmap, int x, int y, char *str)
 {
-    if (!bitmap) return;
+    if ((!bitmap) || (!str)) return;
     while (*str != '\0') {
         TextScreen_PutCell(bitmap, x, y, *str);
         x++;
