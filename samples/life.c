@@ -1,7 +1,7 @@
 /**********************************************************
  conway's game of life
      programming by Coffey   20151030
-               last modified 20160415
+               last modified 20160418
      for Windows, Linux(ubuntu)
  require:
  textscree.c, textscreen.h (version >= 20160406)
@@ -28,7 +28,7 @@
 // max board size
 #define BOARD_SIZE_MAX      10000
 // version string
-#define VERSION_STR         "1.51"
+#define VERSION_STR         "1.52"
 
 #define BOARD_SPACE_CHAR    '.'
 #define BOARD_SURVIVE_CHAR  '#'
@@ -772,6 +772,18 @@ int SaveToClipboard(LifeParam *lp)
     FILE *fp;
     char cell;
     int  x, y, ret = 0;
+    int  ch;
+    
+    // is xsel command exist ?
+    fp = popen("which xsel", "r");
+    if (fp == NULL) {
+        return -1;
+    }
+    ch = fgetc(fp);
+    pclose(fp);
+    if ((ch == EOF) || (ch != '/')) {
+        return -1;
+    }
     
     // use xsel command to put data to clipboard
     fp = popen("xsel --clipboard --input", "w");
@@ -835,10 +847,24 @@ int LoadFromClipboard(LifeParam *lp)
     int  memsize = 8192;
     int  expandsize = 8192;
     int  pos = 0;
+    int  ch;
+    
+    // is xsel command exist ?
+    fp = popen("which xsel", "r");
+    if (fp == NULL) {
+        return -1;
+    }
+    ch = fgetc(fp);
+    pclose(fp);
+    if ((ch == EOF) || (ch != '/')) {
+        return -1;
+    }
     
     // get initial buffer
     localdata = (char *)malloc(memsize);
-    if (!localdata) return -1;
+    if (!localdata) {
+        return -1;
+    }
     
     // use xsel command to get from clipboard
     fp = popen("xsel --clipboard --output", "r");
