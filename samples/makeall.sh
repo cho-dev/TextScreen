@@ -1,6 +1,9 @@
 #!/bin/sh
 # Build all sample
 #
+# Linux  : outExt="out"
+# Windows: outExt="exe"
+#
 cc=gcc
 cp=cp
 rm=rm
@@ -15,6 +18,7 @@ samples="
   sample
   scroll
   showkeycode
+  waveview
 "
 
 ${cp} ../textscreen.* .
