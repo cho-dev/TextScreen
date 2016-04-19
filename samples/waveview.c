@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
     int  ret;
     
     if (argc != 2) {
-        printf("Usage: %s <file name>\n", argv[0]);
+        printf("Usage: %s <WAV file name>\n", argv[0]);
         return -1;
     }
     
@@ -244,6 +244,9 @@ int main(int argc, char *argv[])
     // read wave data
     ret = read_wavedata(argv[1], &wf, wavmap);
     if (ret) {
+        TextScreen_FreeBitmap(wavmap);
+        TextScreen_FreeBitmap(bitmap);
+        TextScreen_End();
         return -1;
     }
     
