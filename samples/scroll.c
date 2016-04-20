@@ -47,7 +47,7 @@ char *read_file(void)
         return NULL;
     }
     
-    fstat(_fileno(fp), &fs);
+    fstat(fileno(fp), &fs);
     buffer = (char *)malloc(fs.st_size + 1);
     if (buffer == NULL) {
         fclose(fp);
