@@ -313,6 +313,7 @@ int main(int argc, char *argv[])
             TextScreen_ShowBitmap(bitmap, 0, 0);
             redraw = 0;
         }
+        TextScreen_Wait(10);
         // check key input
         key = TextScreen_GetKey() & TSK_KEYMASK;
     }
