@@ -10,11 +10,20 @@
  (Linux  ) gcc waveview.c textscreen.c -lm -o waveview.out
  *****************************************/
 
+// MSVC: ignore C4996 warning (fopen -> fopen_s etc...)
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <inttypes.h>
+#include <stdint.h>
 #include <math.h>
+
+#ifdef _MSC_VER
+#define  snprintf _snprintf
+#endif
 
 #include "textscreen.h"
 
@@ -75,7 +84,7 @@ int read1b(FILE *fp, uint8_t *d)
     // read 1 byte
     c = fgetc(fp);
     if (c == EOF) return -1;
-    *d += (uint16_t)c;
+    *d += (uint8_t)c;
     return 0;
 }
 
@@ -93,7 +102,7 @@ uint32_t str2fourcc(char *str)
 int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
 {
     FILE *fp;
-    uint32_t d32, totalsize, size, fourcc;
+    uint32_t d32, totalsize, size, pos, fourcc;
     uint16_t d16;
     uint8_t  d8;
     int  fmt = 0;
@@ -128,7 +137,7 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
            return -1;
         }
         if (fourcc == str2fourcc("fmt ")) {  // format chunk
-            int  pos = 0;
+            pos = 0;
             if (pos < size) { read2b(fp, &d16); wf->wFormatTag = d16; pos += 2; }
             if (pos < size) { read2b(fp, &d16); wf->nChannels = d16; pos += 2; }
             if (pos < size) { read4b(fp, &d32); wf->nSamplesPerSec = d32; pos += 4; }
@@ -146,7 +155,7 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
         } else if (fourcc == str2fourcc("data")) {  // data chunk
             int16_t sdata[64];
             int smax[64] = {0};
-            int i, x, s, pos, tmp;
+            int i, x, s, tmp;
             int height, disprate = 2;
             
             // check error
@@ -211,9 +220,8 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
             }
             wf->length = size / wf->nChannels / 2;
         } else {  // not 'fmt ', 'data' chunk
-            int  i;
             // read through
-            for (i = 0; i < size; i++) {
+            for (pos = 0; pos < size; pos++) {
                 if (read1b(fp, &d8)) {
                     printf("Error: Broken WAV file.\n");
                     fclose(fp);

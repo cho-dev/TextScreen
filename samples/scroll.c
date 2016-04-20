@@ -10,10 +10,24 @@
  (Linux  ) gcc scroll.c textscreen.c -lm -o scroll.out
  also easy to build with MSVC
  *****************************************/
+ 
+// MSVC: ignore C4996 warning (fopen -> fopen_s etc...)
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#ifdef _MSC_VER
+#define  stat     _stat
+#define  fstat    _fstat
+#define  snprintf _snprintf
+#define  fileno   _fileno
+#endif
 
 #include "textscreen.h"
 
@@ -23,28 +37,31 @@
 char *read_file(void)
 {
     FILE *fp;
+    struct stat fs;
     char *buffer;
-    int  memsize = 8192;
     int  pos;
-    
-    buffer = (char *)malloc(memsize);
-    if (buffer == NULL)
-        return NULL;
     
     fp = fopen("scroll.c", "r");
     if (!fp) {
         printf("scroll.c was not found\n");
-        free(buffer);
         return NULL;
     }
+    
+    fstat(_fileno(fp), &fs);
+    buffer = (char *)malloc(fs.st_size + 1);
+    if (buffer == NULL) {
+        fclose(fp);
+        return NULL;
+    }
+    
     pos = 0;
-    while (1) {
+    for (;;) {
         int c;
         
         c = fgetc(fp);
         if (c == EOF) break;
-        buffer[pos++] = c;
-        if (pos >= memsize - 1) break;
+        buffer[pos++] = (char)c;
+        if (pos >= fs.st_size) break;
     }
     buffer[pos] = 0;
     fclose(fp);

@@ -4,23 +4,21 @@
 // build command:
 // gcc showkeycode.c textscreen.c -Wall -lm -o showkeycode.exe
 // --------------------------------------------
+
 #include <string.h>
 #include <stdio.h>
 #include "textscreen.h"
 
 int main(void)
 {
+    int  key = 0;
+    
     TextScreen_Init(NULL);  // initialize TextScreen
     printf("Show TextScreen's keycode. Press key. [q]quit\n");
-    while(1) {
-        char buf[256];
-        int  key;
-        
+    while (key != 'q') {
         key = TextScreen_GetKey();
         if (key) {
-            sprintf(buf, "key = %x, %x         \n", key, key & TSK_KEYMASK);
-            printf("%s",buf);
-            
+            printf("key = %x, %x         \n", key, key & TSK_KEYMASK);
             if (key == 'q') break;
         }
         TextScreen_Wait(50);
