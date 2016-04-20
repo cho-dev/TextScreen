@@ -14,6 +14,7 @@ opt="-Wall -lm"
 samples="
   interrupt
   life
+  rectbench
   resize
   sample
   scroll
