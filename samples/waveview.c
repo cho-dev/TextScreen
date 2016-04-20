@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <math.h>
 
 #include "textscreen.h"
 
@@ -26,6 +27,8 @@ typedef struct {
     int  nBlockAlign;
     int  wBitsPerSample;
     int  cbSize;
+    int  peakLevel[64];
+    int  length;
 } WaveFormat;
 
 int read4b(FILE *fp, uint32_t *d)
@@ -143,7 +146,7 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
         } else if (fourcc == str2fourcc("data")) {  // data chunk
             int16_t sdata[64];
             int smax[64] = {0};
-            int i, x, s, pos;
+            int i, x, s, pos, tmp;
             int height, disprate = 2;
             
             // check error
@@ -175,8 +178,9 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
                         fclose(fp);
                         return -1;
                     }
-                    if (sdata[i] < 0) sdata[i] = -sdata[i];
-                    if (smax[i] < sdata[i]) smax[i] = sdata[i];
+                    tmp = sdata[i];
+                    if (tmp < 0) tmp = -tmp;
+                    if (smax[i] < tmp) smax[i] = tmp;
                     pos += 2;
                 }
                 s++;
@@ -185,6 +189,7 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
                         char buf[32];
                         
                         // draw peak bar
+                        if (smax[i] >= 32768) smax[i] = 32767;
                         TextScreen_DrawLine(bitmap, x, height*(i+1) ,
                                                     x, height*(i+1) - (smax[i] * (height-1) / 32768), '#');
                         
@@ -197,12 +202,14 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
                                 fflush(stdout);
                             }
                         }
+                        if (wf->peakLevel[i] < smax[i]) wf->peakLevel[i] = smax[i];
                         smax[i] = 0;
                     }
                     s = 0;
                     x++;
                 }
             }
+            wf->length = size / wf->nChannels / 2;
         } else {  // not 'fmt ', 'data' chunk
             int  i;
             // read through
@@ -240,6 +247,7 @@ int main(int argc, char *argv[])
     TextScreen_Init(0);
     bitmap = TextScreen_CreateBitmap(0, 0);
     wavmap = TextScreen_CreateBitmap(20000, bitmap->height - 2);
+    memset(&wf, 0, sizeof(wf));
     
     // read wave data
     ret = read_wavedata(argv[1], &wf, wavmap);
@@ -278,9 +286,17 @@ int main(int argc, char *argv[])
         if (redraw) {
             TextScreen_ClearBitmap(bitmap);
             TextScreen_OverlayBitmap(bitmap, wavmap, x, 1);
-            snprintf(buf, sizeof(buf) - 1, "WAVE VIEW(peak) : %dHz : %s", wf.nSamplesPerSec, argv[1]);
+            snprintf(buf, sizeof(buf) - 1, "WAVE VIEW(peak) : %s", argv[1]);
             buf[sizeof(buf) - 1] = 0;
             TextScreen_DrawText(bitmap, 0, 0, buf);
+            snprintf(buf, sizeof(buf) - 1, "Samples %d (%02d:%02d.%03d) : Peak %.1fdB / %.1fdB : Rate %dHz",
+                wf.length, wf.length / wf.nSamplesPerSec / 60, (wf.length / wf.nSamplesPerSec) % 60,
+                (wf.length % wf.nSamplesPerSec) * 1000 / wf.nSamplesPerSec,
+                20*log10((wf.peakLevel[0] ? (double)wf.peakLevel[0] : 0.5)/32768),
+                20*log10((wf.peakLevel[1] ? (double)wf.peakLevel[1] : 0.5)/32768),
+                wf.nSamplesPerSec);
+            buf[sizeof(buf) - 1] = 0;
+            TextScreen_DrawText(bitmap, 0, 1, buf);
             if (wf.nChannels == 2) {
                 TextScreen_DrawText(bitmap, 0, (wavmap->height/2-1)+1, "LEFT");
                 TextScreen_DrawText(bitmap, 0, (wavmap->height/2-1)*2+1, "RIGHT");
