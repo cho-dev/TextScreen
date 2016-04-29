@@ -3,7 +3,7 @@
  
  Read and view WAV file.
      (c)2016 Programming by Coffey
-     Date: 20160420
+     Date: 20160420 - 20160429
  
  build command
  (Windows) gcc waveview.c textscreen.c -lm -o waveview.exe
@@ -161,6 +161,11 @@ int read_wavedata(char *filename, WaveFormat *wf, TextScreenBitmap *bitmap)
             // check error
             if (fmt == 0) {
                 printf("Error: fmt chunk not found.\n");
+                fclose(fp);
+                return -1;
+            }
+            if (wf->wFormatTag != 1) {
+                printf("WAV file is not PCM format.\n");
                 fclose(fp);
                 return -1;
             }
