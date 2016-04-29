@@ -23,26 +23,34 @@
 #include <string.h>
 #include <stdint.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#define  fseek_     _fseeki64
+#define  ftell_     _ftelli64
+#define  fopen_     _wfopen
+typedef  wchar_t    fname_t;
+#define  FILEMODE_READBINARY  L"rb"
+#else  /* else _WIN32 */
+#if _FILE_OFFSET_BITS == 64
+#define  fseek_     fseeko
+#define  ftell_     ftello
+#else  /* else _FILE_OFFSET_BITS==64 */
+#define  fseek_     fseek
+#define  ftell_     ftell
+#endif  /* end else _FILE_OFFSET_BITS==64 */
+#define  fopen_     fopen
+typedef  char       fname_t;
+#define  FILEMODE_READBINARY  "rb"
+#endif  /* end else _WIN32 */
+
 #ifdef _MSC_VER
-#define  snprintf _snprintf
-#define  PRId64   "I64d"
-#define  PRIX64   "I64X"
+#define  snprintf   _snprintf
+#define  snwprintf  _snwprintf
+// for misssing <inttypes.h>
+#define  PRId64     "I64d"
+#define  PRIX64     "I64X"
 #else
 #include <inttypes.h>
-#endif
-
-#ifdef _WIN32
-#undef   fseek
-#undef   ftell
-#define  fseek    _fseeki64
-#define  ftell    _ftelli64
-#else
-#if _FILE_OFFSET_BITS == 64
-#undef   fseek
-#undef   ftell
-#define  fseek    fseeko
-#define  ftell    ftello
-#endif
 #endif
 
 #include "textscreen.h"
@@ -60,7 +68,7 @@ int read1b(FILE *fp, uint8_t *d)
     return 0;
 }
 
-int read_file(char *filename, TextScreenBitmap *dumpmap, int64_t offset)
+int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset)
 {
     FILE *fp;
     uint8_t  d8;
@@ -69,13 +77,14 @@ int read_file(char *filename, TextScreenBitmap *dumpmap, int64_t offset)
     int64_t  count = 0;
     char buf[64];
     
-    fp = fopen(filename, "rb");
+    
+    fp = fopen_(filename, FILEMODE_READBINARY);
     if (fp == NULL ) {
-        printf("%s could not open.(exist ?)\n", filename);
+        printf("File could not open.(exist ?)\n");
         return -1;
     }
     
-    if (fseek(fp, start, SEEK_SET)) {
+    if (fseek_(fp, start, SEEK_SET)) {
         fclose(fp);
         return 0;
     }
@@ -107,7 +116,7 @@ void comma_separate(char *strbuf, int n, int64_t num)
     
     snprintf(strbuf, n - 1, "%"PRId64, num);
     strbuf[n - 1] = 0;
-    for (i = strlen(strbuf) % 3; i < strlen(strbuf); i += 3) {
+    for (i = strlen(strbuf) % 3; i < (int)strlen(strbuf); i += 3) {
         if (i > (strbuf[0] == '-')) {
             for (j = strlen(strbuf); j >= i; j--) {
                 if (j + 2 >= n) return;
@@ -127,22 +136,44 @@ int main(int argc, char *argv[])
     int64_t y, prev_y, ofs, prev_ofs, filesize;
     int  key, redraw;
     int  ret;
+    fname_t filename[1024];
+    char    cfilename[1024];
     
     if (argc != 2) {
-        printf("Binary Dump.\n");
+        printf("Binary Dump. (c)2016 by Coffey\n");
         printf("  Usage: %s <file name>\n", argv[0]);
         return -1;
     }
     
-    {  // get file size
-        FILE *fp;
-        fp = fopen(argv[1], "rb");
-        if (fp == NULL ) {
-            printf("%s could not open (exist ?).\n", argv[1]);
+#ifdef _WIN32
+    {  // for UNICODE(does not map to cp932) file name. eg. heart mark, etc...
+        wchar_t  **argv_w;
+        int      argc_w;
+        
+        argv_w = CommandLineToArgvW(GetCommandLineW(), &argc_w);
+        if (!argv_w) {
+            printf("Error: Cound not get file name string.\n");
             return -1;
         }
-        fseek(fp, 0, SEEK_END);
-        filesize = ftell(fp);
+        snwprintf(filename, sizeof(filename) - 1, L"%s", argv_w[1]);
+        filename[MAX_PATH - 1] = 0;
+        LocalFree(argv_w);
+    }
+#else
+    snprintf(filename, sizeof(filename), "%s", argv[1]);
+#endif
+    snprintf(cfilename, sizeof(cfilename) - 1, "%s", argv[1]);
+    cfilename[sizeof(cfilename) - 1] = 0;
+    
+    {  // get file size
+        FILE *fp;
+        fp = fopen_(filename, FILEMODE_READBINARY);
+        if (fp == NULL ) {
+            printf("File could not open (exist ?).\n");
+            return -1;
+        }
+        fseek_(fp, 0, SEEK_END);
+        filesize = ftell_(fp);
         fclose(fp);
     }
     
@@ -152,7 +183,7 @@ int main(int argc, char *argv[])
     dumpmap = TextScreen_CreateBitmap(0, MAX_VSIZE);
     
     // read file
-    ret = read_file(argv[1], dumpmap, 0);
+    ret = read_file(filename, dumpmap, 0);
     if (ret) {
         TextScreen_FreeBitmap(dumpmap);
         TextScreen_FreeBitmap(bitmap);
@@ -254,7 +285,7 @@ int main(int argc, char *argv[])
             }
             // if change offset, then read from file and redraw dumpmap
             if (prev_ofs != ofs) {
-                ret = read_file(argv[1], dumpmap, ofs);
+                ret = read_file(filename, dumpmap, ofs);
                 if (ret) {
                     TextScreen_FreeBitmap(dumpmap);
                     TextScreen_FreeBitmap(bitmap);
@@ -276,13 +307,14 @@ int main(int argc, char *argv[])
             TextScreen_ClearBitmap(bitmap);
             TextScreen_DrawText(bitmap, 0, 0, headtext);
             TextScreen_DrawLine(bitmap, 0, 1, 75, 1, '-');
-            TextScreen_CopyRect(bitmap, dumpmap, 0, 2, 0, y, bitmap->width, bitmap->height - 5, 0);
-            TextScreen_DrawText(bitmap, 0, bitmap->height - 2, helptext);
+            TextScreen_CopyRect(bitmap, dumpmap, 0, 2, 0, y, bitmap->width, bitmap->height - 6, 0);
+            TextScreen_DrawText(bitmap, 0, bitmap->height - 3, cfilename);
             comma_separate(nbuf1, sizeof(nbuf1), (y + ofs) * 16);
             comma_separate(nbuf2, sizeof(nbuf2), filesize);
             snprintf(buf, 255, "%"PRIX64"=%sbytes, MapOffset=%"PRId64", FileSize=%sbytes", 
                             (int64_t)((y + ofs) * 16), nbuf1, (int64_t)ofs, nbuf2);
-            TextScreen_DrawText(bitmap, 0, bitmap->height - 1, buf);
+            TextScreen_DrawText(bitmap, 0, bitmap->height - 2, buf);
+            TextScreen_DrawText(bitmap, 0, bitmap->height - 1, helptext);
             TextScreen_ShowBitmap(bitmap, 0, 0);
             redraw = 0;
         }
