@@ -58,6 +58,25 @@ typedef  char       fname_t;
 // MAX_VSIZE >= 512 and multiples of 256 (align 4096 bytes for read performance)
 #define MAX_VSIZE  2048
 
+// my translate table (control code -> '.')
+static unsigned char gTranstable[256] = {
+    0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e,
+    0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e,
+    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+    0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+    0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+    0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x2e,
+    0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
+    0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
+    0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf,
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf,
+    0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
+    0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef,
+    0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0x2e, 0x2e, 0x2e };
+
 int read1b(FILE *fp, uint8_t *d)
 {
     int  c;
@@ -68,7 +87,7 @@ int read1b(FILE *fp, uint8_t *d)
     return 0;
 }
 
-int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset)
+int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset, int ascii7)
 {
     FILE *fp;
     uint8_t  d8;
@@ -77,18 +96,15 @@ int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset)
     int64_t  count = 0;
     char buf[64];
     
-    
     fp = fopen_(filename, FILEMODE_READBINARY);
     if (fp == NULL ) {
         printf("File could not open.(exist ?)\n");
         return -1;
     }
-    
     if (fseek_(fp, start, SEEK_SET)) {
         fclose(fp);
         return 0;
     }
-    
     TextScreen_ClearBitmap(dumpmap);
     while (!read1b(fp, &d8)) {
         if (count % 16 == 0) {
@@ -100,7 +116,7 @@ int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset)
         }
         snprintf(buf, sizeof(buf), "%02X", (int)d8);
         TextScreen_DrawText(dumpmap, (count % 16) * 3 + 10, count / 16, buf);
-        TextScreen_PutCell(dumpmap, (count % 16) + 60, count / 16, d8);
+        TextScreen_PutCell(dumpmap, (count % 16) + 60, count / 16, (ascii7 && (d8 >= 0x80)) ? 0x2e: d8);
         count++;
         if (count >= maxdata) break;
     }
@@ -132,9 +148,10 @@ int main(int argc, char *argv[])
 {
     char helptext[] = "[Arrow][PageUP/Down]scroll  [Home][End]Top/Bottom  [q][Esc]quit";
     char headtext[] = "Address | +0 +1 +2 +3 +4 +5 +6 +7 +8 +9 +A +B +C +D +E +F   0123456789ABCDEF";
-    TextScreenBitmap *bitmap, *dumpmap;
+    TextScreenBitmap   *bitmap, *dumpmap;
+    TextScreenSetting  setting;
     int64_t y, prev_y, ofs, prev_ofs, filesize;
-    int  key, redraw;
+    int  key, redraw, reread, ascii7 = 1;
     int  ret;
     fname_t filename[1024];
     char    cfilename[1024];
@@ -179,17 +196,13 @@ int main(int argc, char *argv[])
     
     // initialize TextScreen
     TextScreen_Init(0);
+    // set my translate table
+    TextScreen_GetSetting(&setting);
+    setting.translate = (char *)gTranstable;
+    TextScreen_SetSetting(&setting);
+    // create bitmap, dumpmap
     bitmap  = TextScreen_CreateBitmap(0, 0);
     dumpmap = TextScreen_CreateBitmap(0, MAX_VSIZE);
-    
-    // read file
-    ret = read_file(filename, dumpmap, 0);
-    if (ret) {
-        TextScreen_FreeBitmap(dumpmap);
-        TextScreen_FreeBitmap(bitmap);
-        TextScreen_End();
-        return -1;
-    }
     
     // clear screen, hide cursor, set initial value
     TextScreen_ClearScreen();
@@ -198,6 +211,7 @@ int main(int argc, char *argv[])
     ofs = 0;
     key = 0;
     redraw = 1;
+    reread = 1;
     
     // main loop
     while ((key != 'q') && (key != TSK_ESC)) {  // q or Esc key then quit
@@ -259,12 +273,17 @@ int main(int argc, char *argv[])
                 case 'z':
                     y += 0x10000000LL;
                     break;
-                case TSK_HOME:         // Home key
+                case TSK_HOME:
                     y = 0;
                     ofs = 0;
                     break;
-                case TSK_END:          // End key
+                case TSK_END:
                     y = (filesize / 16) - ofs;
+                    break;
+                case '.':  // toggle 7bit/8bit ascii
+                    ascii7 = !(ascii7);
+                    reread = 1;
+                    redraw = 1;
                     break;
             }
             // current pointer over the end of file
@@ -285,18 +304,25 @@ int main(int argc, char *argv[])
             }
             // if change offset, then read from file and redraw dumpmap
             if (prev_ofs != ofs) {
-                ret = read_file(filename, dumpmap, ofs);
-                if (ret) {
-                    TextScreen_FreeBitmap(dumpmap);
-                    TextScreen_FreeBitmap(bitmap);
-                    TextScreen_End();
-                    return -1;
-                }
-            }
-            // view pointer changed ?
-            if ((prev_y != y) || (prev_ofs != ofs)) {
+                reread = 1;
                 redraw = 1;
             }
+            // view pointer changed ?
+            if (prev_y != y) {
+                redraw = 1;
+            }
+        }
+        
+        // read from file
+        if (reread) {
+            ret = read_file(filename, dumpmap, ofs, ascii7);
+            if (ret) {
+                TextScreen_FreeBitmap(dumpmap);
+                TextScreen_FreeBitmap(bitmap);
+                TextScreen_End();
+                return -1;
+            }
+            reread = 0;
         }
         // redraw screen
         if (redraw) {
