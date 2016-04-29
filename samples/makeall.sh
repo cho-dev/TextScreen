@@ -20,6 +20,7 @@ samples="
   scroll
   showkeycode
   waveview
+  bindump
 "
 
 ${cp} ../textscreen.* .
