@@ -1,14 +1,12 @@
 #!/bin/sh
 # Build all sample
 #
-# Linux  : outExt="out"
-# Windows: outExt="exe"
-#
 cc=gcc
 cp=cp
 rm=rm
-outExt="out"
-#outExt="exe"
+outExt=""
+#outExt=".out"
+#outExt=".exe"
 libsrc="textscreen.c"
 opt="-Wall -lm"
 samples="
@@ -21,13 +19,14 @@ samples="
   showkeycode
   waveview
   bindump
+  hello
 "
 
 ${cp} ../textscreen.* .
 for src in ${samples}
 do
   inFile=${src}.c
-  outFile=${src}.${outExt}
+  outFile=${src}${outExt}
   echo "${cc} ${inFile} ${libsrc} ${opt} -o ${outFile}"
   ${cc} ${inFile} ${libsrc} ${opt} -o ${outFile}
   echo "done."
