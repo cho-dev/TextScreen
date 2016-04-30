@@ -3,7 +3,7 @@
  
  binary dump.
      (c)2016 Programming by Coffey
-     Date: 20160429
+     Date: 20160429 - 20160430
  
  build command
  (Windows) gcc bindump.c textscreen.c -lm -o bindump.exe
@@ -98,7 +98,7 @@ int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset, int 
     
     fp = fopen_(filename, FILEMODE_READBINARY);
     if (fp == NULL ) {
-        printf("File could not open.(exist ?)\n");
+        printf("\nFile could not open.(exist ?)\n");
         return -1;
     }
     if (fseek_(fp, start, SEEK_SET)) {
@@ -126,7 +126,7 @@ int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset, int 
 }
 
 // make comma separated num string
-void comma_separate(char *strbuf, int n, int64_t num)
+void comma_separate_numstr(char *strbuf, int n, int64_t num)
 {
     int  i, j;
     
@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
     TextScreenBitmap   *bitmap, *dumpmap;
     TextScreenSetting  setting;
     int64_t y, prev_y, ofs, prev_ofs, filesize;
+    int  consoleWidth, consoleHeight;
     int  key, redraw, reread, ascii7 = 1;
     int  ret;
     fname_t filename[1024];
@@ -159,9 +160,10 @@ int main(int argc, char *argv[])
     if (argc != 2) {
         printf("Binary Dump. (c)2016 by Coffey\n");
         printf("  Usage: %s <file name>\n", argv[0]);
-        return -1;
+        exit(0);
     }
     
+    // get file name from argument
 #ifdef _WIN32
     {  // for UNICODE(does not map to cp932) file name. eg. heart mark, etc...
         wchar_t  **argv_w;
@@ -170,7 +172,7 @@ int main(int argc, char *argv[])
         argv_w = CommandLineToArgvW(GetCommandLineW(), &argc_w);
         if (!argv_w) {
             printf("Error: Cound not get file name string.\n");
-            return -1;
+            exit(-1);
         }
         snwprintf(filename, sizeof(filename) - 1, L"%s", argv_w[1]);
         filename[MAX_PATH - 1] = 0;
@@ -187,7 +189,7 @@ int main(int argc, char *argv[])
         fp = fopen_(filename, FILEMODE_READBINARY);
         if (fp == NULL ) {
             printf("File could not open (exist ?).\n");
-            return -1;
+            exit(-1);
         }
         fseek_(fp, 0, SEEK_END);
         filesize = ftell_(fp);
@@ -202,7 +204,14 @@ int main(int argc, char *argv[])
     TextScreen_SetSetting(&setting);
     // create bitmap, dumpmap
     bitmap  = TextScreen_CreateBitmap(0, 0);
-    dumpmap = TextScreen_CreateBitmap(0, MAX_VSIZE);
+    dumpmap = TextScreen_CreateBitmap(76, MAX_VSIZE);
+    if (!bitmap || !dumpmap) {
+        TextScreen_End();
+        exit(-1);
+    }
+    
+    // get current console size
+    TextScreen_GetConsoleSize(&consoleWidth, &consoleHeight);
     
     // clear screen, hide cursor, set initial value
     TextScreen_ClearScreen();
@@ -285,6 +294,10 @@ int main(int argc, char *argv[])
                     reread = 1;
                     redraw = 1;
                     break;
+                case 'r':  // reload
+                    reread = 1;
+                    redraw = 1;
+                    break;
             }
             // current pointer over the end of file
             if (y + ofs > (filesize / 16)) {
@@ -313,14 +326,31 @@ int main(int argc, char *argv[])
             }
         }
         
+        {  // console resize check
+            int  width, height;
+            
+            TextScreen_GetConsoleSize(&width, &height);
+            if ((width != consoleWidth) || (height != consoleHeight)) {
+                TextScreen_ResizeScreen(0, 0);
+                TextScreen_FreeBitmap(bitmap);
+                bitmap = TextScreen_CreateBitmap(0, 0);
+                if (!bitmap) {
+                    TextScreen_End();
+                    exit(-1);
+                }
+                TextScreen_ClearScreen();
+                consoleWidth  = width;
+                consoleHeight = height;
+                redraw = 1;
+            }
+        }
+        
         // read from file
         if (reread) {
             ret = read_file(filename, dumpmap, ofs, ascii7);
             if (ret) {
-                TextScreen_FreeBitmap(dumpmap);
-                TextScreen_FreeBitmap(bitmap);
                 TextScreen_End();
-                return -1;
+                exit(-1);
             }
             reread = 0;
         }
@@ -333,10 +363,10 @@ int main(int argc, char *argv[])
             TextScreen_ClearBitmap(bitmap);
             TextScreen_DrawText(bitmap, 0, 0, headtext);
             TextScreen_DrawLine(bitmap, 0, 1, 75, 1, '-');
-            TextScreen_CopyRect(bitmap, dumpmap, 0, 2, 0, y, bitmap->width, bitmap->height - 6, 0);
+            TextScreen_CopyRect(bitmap, dumpmap, 0, 2, 0, y, 76, bitmap->height - 6, 0);
             TextScreen_DrawText(bitmap, 0, bitmap->height - 3, cfilename);
-            comma_separate(nbuf1, sizeof(nbuf1), (y + ofs) * 16);
-            comma_separate(nbuf2, sizeof(nbuf2), filesize);
+            comma_separate_numstr(nbuf1, sizeof(nbuf1), (y + ofs) * 16);
+            comma_separate_numstr(nbuf2, sizeof(nbuf2), filesize);
             snprintf(buf, 255, "%"PRIX64"=%sbytes, MapOffset=%"PRId64", FileSize=%sbytes", 
                             (int64_t)((y + ofs) * 16), nbuf1, (int64_t)ofs, nbuf2);
             TextScreen_DrawText(bitmap, 0, bitmap->height - 2, buf);
@@ -344,6 +374,7 @@ int main(int argc, char *argv[])
             TextScreen_ShowBitmap(bitmap, 0, 0);
             redraw = 0;
         }
+        
         // sleep 10msec
         TextScreen_Wait(10);
         // check key input
