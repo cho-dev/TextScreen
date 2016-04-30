@@ -4,8 +4,7 @@
 cc=gcc
 cp=cp
 rm=rm
-outExt=""
-#outExt=".out"
+outExt=".out"
 #outExt=".exe"
 libsrc="textscreen.c"
 opt="-Wall -lm"
