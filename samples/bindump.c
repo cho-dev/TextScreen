@@ -87,7 +87,7 @@ int read1b(FILE *fp, uint8_t *d)
     return 0;
 }
 
-int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset, int ascii7)
+int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset, int style, int ascii7)
 {
     FILE *fp;
     uint8_t  d8;
@@ -114,8 +114,24 @@ int read_file(fname_t *filename, TextScreenBitmap *dumpmap, int64_t offset, int 
                 TextScreen_PutCell(dumpmap, 0, count / 16, '>');
             }
         }
-        snprintf(buf, sizeof(buf), "%02X", (int)d8);
-        TextScreen_DrawText(dumpmap, (count % 16) * 3 + 10, count / 16, buf);
+        switch (style) {
+            case 0:
+                snprintf(buf, sizeof(buf), "%02X", (int)d8);
+                TextScreen_DrawText(dumpmap, (count % 16) * 3 + (count % 16 >= 8) + 10, count / 16, buf);
+                break;
+            case 1:
+                snprintf(buf, sizeof(buf), "%3d", (int)d8);
+                TextScreen_DrawText(dumpmap, (count % 16) * 3 + (count % 16 >= 8) + 9, count / 16, buf);
+                break;
+            case 2:
+                snprintf(buf, sizeof(buf), "%02X", (int)d8);
+                TextScreen_DrawText(dumpmap, (count % 16) * 3 + (count % 16 >= 8) + 10 - (count % 2), count / 16, buf);
+                break;
+            case 3:
+                snprintf(buf, sizeof(buf), "%02X", (int)d8);
+                TextScreen_DrawText(dumpmap, (count % 16) * 3 + (count % 16 >= 8) + 12 - (count % 2) * 5, count / 16, buf);
+                break;
+        }
         TextScreen_PutCell(dumpmap, (count % 16) + 60, count / 16, (ascii7 && (d8 >= 0x80)) ? 0x2e: d8);
         count++;
         if (count >= maxdata) break;
@@ -144,15 +160,38 @@ void comma_separate_numstr(char *strbuf, int n, int64_t num)
     }
 }
 
+void draw_help(TextScreenBitmap *bitmap)
+{
+    int  x = 14, y = 7;
+    
+    TextScreen_DrawFillRect(bitmap, x - 2, y - 1, 60, 10, ' ');
+    TextScreen_DrawText(bitmap, x, y++, "bindump (c)2016 Coffey.");
+    TextScreen_DrawText(bitmap, x, y++, "[arrow up/down/left/right][Page Up/Down] inc/dec address");
+    TextScreen_DrawText(bitmap, x, y++, "[a][s][d][f][g][h][j][k] decrease address each digit");
+    TextScreen_DrawText(bitmap, x, y++, "[z][x][c][v][b][n][m][,] increase address each digit");
+    TextScreen_DrawText(bitmap, x, y++, "[l] toggle view style (Hex/Dec/short/change-endian)");
+    TextScreen_DrawText(bitmap, x, y++, "[.] toggle character view style (7/8bit ascii)");
+    TextScreen_DrawText(bitmap, x, y++, "[r] reload from file and redraw");
+    TextScreen_DrawText(bitmap, x, y++, "[i] show/hide help   [q][Esc] quit");
+}
+
 int main(int argc, char *argv[])
 {
-    char helptext[] = "[Arrow][PageUP/Down]scroll  [Home][End]Top/Bottom  [q][Esc]quit";
-    char headtext[] = "Address | +0 +1 +2 +3 +4 +5 +6 +7 +8 +9 +A +B +C +D +E +F   0123456789ABCDEF";
+    char *helptext     = "[i]help  [q][Esc]quit";
+    char *headtext[]   = {"Address | +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F  0123456789ABCDEF",
+                          "Address | +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F  0123456789ABCDEF",
+                          "Address | +0+1  +2+3  +4+5  +6+7   +8+9  +A+B  +C+D  +E+F   0123456789ABCDEF",
+                          "Address | +1+0  +3+2  +5+4  +7+6   +9+8  +B+A  +D+C  +F+E   0123456789ABCDEF"};
+    char *headtext2[]  = {"----------------------------------------------------------------------------",
+                          "-----------v--v--v--v--v--v--v--v---v--v--v--v--v--v--v--v------------------",
+                          "-----------v-v---v-v---v-v---v-v----v-v---v-v---v-v---v-v-------------------",
+                          "-----------vxv---vxv---vxv---vxv----vxv---vxv---vxv---vxv-------------------"};
     TextScreenBitmap   *bitmap, *dumpmap;
     TextScreenSetting  setting;
     int64_t y, prev_y, ofs, prev_ofs, filesize;
     int  consoleWidth, consoleHeight;
-    int  key, redraw, reread, ascii7 = 1;
+    int  key, redraw, reread;
+    int  ascii7 = 1, style = 0, help = 0;
     int  ret;
     fname_t filename[1024];
     char    cfilename[1024];
@@ -294,6 +333,18 @@ int main(int argc, char *argv[])
                     reread = 1;
                     redraw = 1;
                     break;
+                case 'l':  // toggle style
+                    style++;
+                    if (style > 3) {
+                        style = 0;
+                    }
+                    reread = 1;
+                    redraw = 1;
+                    break;
+                case 'i':  // help
+                    help = !(help);
+                    redraw = 1;
+                    break;
                 case 'r':  // reload
                     reread = 1;
                     redraw = 1;
@@ -347,7 +398,7 @@ int main(int argc, char *argv[])
         
         // read from file
         if (reread) {
-            ret = read_file(filename, dumpmap, ofs, ascii7);
+            ret = read_file(filename, dumpmap, ofs, style, ascii7);
             if (ret) {
                 TextScreen_End();
                 exit(-1);
@@ -361,16 +412,21 @@ int main(int argc, char *argv[])
             char nbuf2[32];
             
             TextScreen_ClearBitmap(bitmap);
-            TextScreen_DrawText(bitmap, 0, 0, headtext);
-            TextScreen_DrawLine(bitmap, 0, 1, 75, 1, '-');
+            TextScreen_DrawText(bitmap, 0, 0, headtext[style]);
+            TextScreen_DrawText(bitmap, 0, 1, headtext2[style]);
             TextScreen_CopyRect(bitmap, dumpmap, 0, 2, 0, y, 76, bitmap->height - 6, 0);
             TextScreen_DrawText(bitmap, 0, bitmap->height - 3, cfilename);
             comma_separate_numstr(nbuf1, sizeof(nbuf1), (y + ofs) * 16);
             comma_separate_numstr(nbuf2, sizeof(nbuf2), filesize);
-            snprintf(buf, 255, "%"PRIX64"=%sbytes, MapOffset=%"PRId64", FileSize=%sbytes", 
-                            (int64_t)((y + ofs) * 16), nbuf1, (int64_t)ofs, nbuf2);
+            snprintf(buf, 255, "%016"PRIX64" = %sbytes / %sbytes", 
+                            (int64_t)((y + ofs) * 16), nbuf1, nbuf2);
+            // snprintf(buf, 255, "%"PRIX64"=%sbytes, MapOffset=%"PRId64", FileSize=%sbytes", 
+            //                 (int64_t)((y + ofs) * 16), nbuf1, (int64_t)ofs, nbuf2);
             TextScreen_DrawText(bitmap, 0, bitmap->height - 2, buf);
             TextScreen_DrawText(bitmap, 0, bitmap->height - 1, helptext);
+            if (help) {
+                draw_help(bitmap);
+            }
             TextScreen_ShowBitmap(bitmap, 0, 0);
             redraw = 0;
         }
