@@ -3,7 +3,7 @@
  
  binary dump.
      (c)2016 Programming by Coffey
-     Date: 20160429 - 20160430
+     Date: 20160429 - 20160502
  
  build command
  (Windows) gcc bindump.c textscreen.c -lm -o bindump.exe
@@ -151,7 +151,7 @@ void comma_separate_numstr(char *strbuf, int n, int64_t num)
     for (i = strlen(strbuf) % 3; i < (int)strlen(strbuf); i += 3) {
         if (i > (strbuf[0] == '-')) {
             for (j = strlen(strbuf); j >= i; j--) {
-                if (j + 2 >= n) return;
+                if (j + 1 >= n) return;
                 strbuf[j + 1] = strbuf[j];
             }
             strbuf[i] = ',';
@@ -354,9 +354,10 @@ int main(int argc, char *argv[])
             if (y + ofs > (filesize / 16)) {
                 y = (filesize / 16) - ofs;
             }
-            // if current pointer is out of between 1/8-7/8 of dump bitmap, then recalc offset
-            if ((y < MAX_VSIZE / 8) || (y > MAX_VSIZE * 7 / 8)) {
+            // recalc offset when current view is out of dump bitmap
+            if ((y < 0) || (y > MAX_VSIZE - consoleHeight)) {
                 int64_t  ofs1 = ofs;
+                // offset alignment = 4096byte (256 * 16)
                 ofs = ((y + ofs) - (MAX_VSIZE / 2)) & 0xffffffffffffff00;
                 if (ofs < 0) {
                     ofs = 0;
