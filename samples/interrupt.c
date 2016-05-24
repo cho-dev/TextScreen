@@ -27,7 +27,7 @@ void sigint_handler(int sig, void *userdata)
 int main(void)
 {
     int key = 0;
-    char *mes = "[Ctrl]+[C] was pressed !!";
+    char mes[] = "[Ctrl]+[C] was pressed !!";
     
     // initialize TextScreen
     TextScreen_Init(0);

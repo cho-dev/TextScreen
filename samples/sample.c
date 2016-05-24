@@ -13,7 +13,7 @@ int main(void)
 {
     TextScreenBitmap   *bitmap, *sprite;      // bitmap pointer
     int  x, y, xd, yd, key;
-    char *helptext =  "Press [q] or [Esc] to exit";
+    const char *helptext =  "Press [q] or [Esc] to exit";
     
     TextScreen_Init(0);                       // Initialize
     TextScreen_SetSpaceChar('.');             // set space char to '.'

@@ -4,7 +4,7 @@
  TextScreen library. (C version)
      by Coffey (c)2015-2016
      
-     VERSION 20160418
+     VERSION 20160525
      
      Windows     : Win2K or later
      Non Windows : console support ANSI escape sequence
@@ -954,7 +954,7 @@ void TextScreen_DrawLine(TextScreenBitmap *bitmap, int x1, int y1, int x2, int y
     }
 }
 
-void TextScreen_DrawText(TextScreenBitmap *bitmap, int x, int y, char *str)
+void TextScreen_DrawText(TextScreenBitmap *bitmap, int x, int y, const char *str)
 {
     if ((!bitmap) || (!str)) return;
     while (*str != '\0') {

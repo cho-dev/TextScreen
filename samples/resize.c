@@ -21,7 +21,7 @@ int main(void)
     int  width, height;
     int  consoleWidth, consoleHeight;
     int  key, redraw;
-    char *helptext = "[q] or [Esc] to exit. Try change window size.";
+    const char *helptext = "[q] or [Esc] to exit. Try change window size.";
     
     // initialize TextScreen
     TextScreen_Init(0);

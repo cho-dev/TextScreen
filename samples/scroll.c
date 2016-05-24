@@ -139,7 +139,7 @@ int main(void)
         int  x, y;
         int  key;
         int  redraw, showlineno;
-        char *helptext = "[arrow key]scroll view  [home]reset view  [l]line No.  [q][Esc]exit";
+        const char *helptext = "[arrow key]scroll view  [home]reset view  [l]line No.  [q][Esc]exit";
         
         // draw to screen
         x = 0;

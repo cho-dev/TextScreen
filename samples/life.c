@@ -1270,7 +1270,7 @@ void SetBoardSize(LifeParam *lp)
 void LoadPreset(LifeParam *lp)
 {
     // Preset Patterns ("title", "1st line", "2nd line", ... "")
-    char *preset_pattern[] = {
+    const char *preset_pattern[] = {
         // F(R) pentomino
         "R-pentomino (F-pentomino)",
         "S23/B3",
@@ -1573,7 +1573,7 @@ void EditBoard(LifeParam *lp)
 {
     int quit = 0;
     int curx, cury;
-    char *helptext = "  [space]toggle [Enter]start [x]clear [v]paste [r]read [s]store [h]help";
+    const char *helptext = "  [space]toggle [Enter]start [x]clear [v]paste [r]read [s]store [h]help";
 
 #define EDITBOARD_CURSORCENTER() {  \
     curx = (lp->setting.width  + 1) / 2 + lp->setting.leftMargin;  \

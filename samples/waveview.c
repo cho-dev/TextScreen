@@ -245,7 +245,7 @@ int main(int argc, char *argv[])
 {
     WaveFormat wf;
     TextScreenBitmap *bitmap, *wavmap;
-    char *helptext = "[Arrow key]scroll  [Home]reset view  [q][Esc]quit";
+    const char *helptext = "[Arrow key]scroll  [Home]reset view  [q][Esc]quit";
     char buf[256];
     int  x;
     int  key, redraw;

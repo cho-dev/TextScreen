@@ -14,7 +14,7 @@
 #ifndef TEXTSCREEN_TEXTSCREEN_H
 #define TEXTSCREEN_TEXTSCREEN_H
 
-#define TEXTSCREEN_TEXTSCREEN_VERSION 20160418
+#define TEXTSCREEN_TEXTSCREEN_VERSION 20160525
 
 // max bitmap width and height
 #define TEXTSCREEN_MAXSIZE 32768
@@ -175,7 +175,7 @@ void TextScreen_DrawRectP(TextScreenBitmap *bitmap, int x, int y, int x1, int y1
 void TextScreen_DrawLine(TextScreenBitmap *bitmap, int x1, int y1, int x2, int y2, char ch);
 
 // bitmap handle=bitmap; draw position(x,y); text string=str
-void TextScreen_DrawText(TextScreenBitmap *bitmap, int x, int y, char *str);
+void TextScreen_DrawText(TextScreenBitmap *bitmap, int x, int y, const char *str);
 
 // bitmap handle=bitmap; get character at (x,y)
 char TextScreen_GetCell(TextScreenBitmap *bitmap, int x, int y);
@@ -236,7 +236,7 @@ int main(void)
 {
     TextScreenBitmap   *bitmap, *sprite;      // bitmap pointer
     int  x, y, xd, yd, key;
-    char *helptext =  "Press [q] or [Esc] to exit";
+    const char *helptext =  "Press [q] or [Esc] to exit";
     
     TextScreen_Init(0);                       // Initialize
     TextScreen_SetSpaceChar('.');             // set space char to '.'

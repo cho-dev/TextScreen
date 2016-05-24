@@ -177,15 +177,17 @@ void draw_help(TextScreenBitmap *bitmap)
 
 int main(int argc, char *argv[])
 {
-    char *helptext     = "[i]help  [q][Esc]quit";
-    char *headtext[]   = {"Address | +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F  0123456789ABCDEF",
-                          "Address | +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F  0123456789ABCDEF",
-                          "Address | +0+1  +2+3  +4+5  +6+7   +8+9  +A+B  +C+D  +E+F   0123456789ABCDEF",
-                          "Address | +1+0  +3+2  +5+4  +7+6   +9+8  +B+A  +D+C  +F+E   0123456789ABCDEF"};
-    char *headtext2[]  = {"----------------------------------------------------------------------------",
-                          "-----------v--v--v--v--v--v--v--v---v--v--v--v--v--v--v--v------------------",
-                          "-----------v-v---v-v---v-v---v-v----v-v---v-v---v-v---v-v-------------------",
-                          "-----------vxv---vxv---vxv---vxv----vxv---vxv---vxv---vxv-------------------"};
+    const char *helptext     = "[i]help  [q][Esc]quit";
+    const char *headtext[]   =
+            {"Address | +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F  0123456789ABCDEF",
+             "Address | +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F  0123456789ABCDEF",
+             "Address | +0+1  +2+3  +4+5  +6+7   +8+9  +A+B  +C+D  +E+F   0123456789ABCDEF",
+             "Address | +1+0  +3+2  +5+4  +7+6   +9+8  +B+A  +D+C  +F+E   0123456789ABCDEF"};
+    const char *headtext2[]  =
+            {"----------------------------------------------------------------------------",
+             "-----------v--v--v--v--v--v--v--v---v--v--v--v--v--v--v--v------------------",
+             "-----------v-v---v-v---v-v---v-v----v-v---v-v---v-v---v-v-------------------",
+             "-----------vxv---vxv---vxv---vxv----vxv---vxv---vxv---vxv-------------------"};
     TextScreenBitmap   *bitmap, *dumpmap;
     TextScreenSetting  setting;
     int64_t y, prev_y, ofs, prev_ofs, filesize;
